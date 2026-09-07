@@ -6,6 +6,7 @@ from app.transformers.preset import (
     ColumnExtractTransformer,
     PresetTransformer,
     RoundTransformer,
+    ZeroPadTransformer,
 )
 from app.transformers.template import TemplateTransformer
 
@@ -13,6 +14,7 @@ __all__ = [
     "BaseTransformer",
     "TransformResult",
     "RoundTransformer",
+    "ZeroPadTransformer",
     "ColumnExtractTransformer",
     "PresetTransformer",
     "TemplateTransformer",

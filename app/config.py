@@ -22,6 +22,9 @@ class AppConfig:
     # 定型ルール設定
     round_enabled: bool = True
     round_digits: int = 2
+    pad_enabled: bool = False
+    pad_int_digits: int = 3
+    pad_dec_digits: int = 2
     col_enabled: bool = False
     col_delimiter: str = ","
     col_indices: str = "1, -1"

@@ -5,6 +5,7 @@ from app.transformers.preset import (
     ColumnExtractTransformer,
     PresetTransformer,
     RoundTransformer,
+    ZeroPadTransformer,
 )
 
 
@@ -80,6 +81,39 @@ class TestColumnExtractTransformer(unittest.TestCase):
         self.assertEqual(result.text, "a, c\nx")
 
 
+class TestZeroPadTransformer(unittest.TestCase):
+    """数値ゼロ埋め（パディング）変換器のテスト"""
+
+    def test_pad_integer_only(self):
+        transformer = ZeroPadTransformer(int_digits=3, dec_digits=0)
+        result = transformer.transform("5, 42.1, -7, 1234")
+        self.assertTrue(result.success)
+        self.assertEqual(result.text, "005, 042.1, -007, 1234")
+
+    def test_pad_decimal_only(self):
+        transformer = ZeroPadTransformer(int_digits=0, dec_digits=2)
+        result = transformer.transform("5, 42.1, 3.1415")
+        self.assertTrue(result.success)
+        self.assertEqual(result.text, "5.00, 42.10, 3.14")
+
+    def test_pad_both_integer_and_decimal(self):
+        transformer = ZeroPadTransformer(int_digits=3, dec_digits=2)
+        result = transformer.transform("5, 42.1, -7.5, 98.2%")
+        self.assertTrue(result.success)
+        self.assertEqual(result.text, "005.00, 042.10, -007.50, 098.20%")
+
+    def test_rounding_carry_over(self):
+        # 0.999 を小数2桁に丸めると 1.00 になり、整数部が 0 -> 1 になるケース
+        transformer = ZeroPadTransformer(int_digits=3, dec_digits=2)
+        result = transformer.transform("0.999")
+        self.assertTrue(result.success)
+        self.assertEqual(result.text, "001.00")
+
+    def test_invalid_digits_raises(self):
+        with self.assertRaises(ValueError):
+            ZeroPadTransformer(int_digits=0, dec_digits=0)
+
+
 class TestPresetTransformer(unittest.TestCase):
     """複合定型ルール変換器のテスト"""
 
@@ -100,8 +134,23 @@ class TestPresetTransformer(unittest.TestCase):
         self.assertIn("小数2桁丸め", result.message)
         self.assertIn("列抽出", result.message)
 
+    def test_combined_pad_and_column_extract(self):
+        transformer = PresetTransformer(
+            pad_enabled=True,
+            pad_int_digits=3,
+            pad_dec_digits=2,
+            col_enabled=True,
+            col_delimiter=",",
+            col_indices=[1, 2],
+        )
+        input_text = "Item, 5\nItem, 42.1"
+        result = transformer.transform(input_text)
+        self.assertTrue(result.success)
+        self.assertEqual(result.text, "Item, 005.00\nItem, 042.10")
+        self.assertIn("ゼロ埋め", result.message)
+
     def test_no_rule_enabled(self):
-        transformer = PresetTransformer(round_enabled=False, col_enabled=False)
+        transformer = PresetTransformer(round_enabled=False, col_enabled=False, pad_enabled=False)
         result = transformer.transform("12.345%")
         self.assertFalse(result.success)
         self.assertEqual(result.status, "skip")

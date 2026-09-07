@@ -29,6 +29,9 @@ class TestConfig(unittest.TestCase):
             is_active=True,
             active_tab="プログラマブルモード",
             round_digits=4,
+            pad_enabled=True,
+            pad_int_digits=5,
+            pad_dec_digits=3,
             col_indices="2, 3",
             prog_mode="pattern",
             prog_pattern_input="私は{a}時間で{b}つのりんご",
@@ -42,6 +45,9 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(loaded.is_active)
         self.assertEqual(loaded.active_tab, "プログラマブルモード")
         self.assertEqual(loaded.round_digits, 4)
+        self.assertTrue(loaded.pad_enabled)
+        self.assertEqual(loaded.pad_int_digits, 5)
+        self.assertEqual(loaded.pad_dec_digits, 3)
         self.assertEqual(loaded.col_indices, "2, 3")
         self.assertEqual(loaded.prog_mode, "pattern")
         self.assertEqual(loaded.prog_pattern_input, "私は{a}時間で{b}つのりんご")
