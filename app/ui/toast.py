@@ -7,7 +7,16 @@ import customtkinter as ctk
 class ToastNotification(ctk.CTkToplevel):
     """画面隅または親ウィンドウ上に一時表示される軽量トースト通知。
 
-    CustomTkinter の CTkToplevel を用い、枠なしウィンドウとして一定時間表示後に自動消去される。
+    Parameters
+    ----------
+    parent : ctk.CTk
+        親となるメインウィンドウ。
+    message : str
+        表示する通知メッセージ。
+    level : str, optional
+        通知レベル ('success', 'skip', 'error', 'info')。デフォルトは 'info'。
+    duration_ms : int, optional
+        通知を表示するミリ秒数。デフォルトは 2500。
     """
 
     COLOR_MAP = {
@@ -24,13 +33,7 @@ class ToastNotification(ctk.CTkToplevel):
         level: str = "info",
         duration_ms: int = 2500,
     ):
-        """
-        Args:
-            parent: 親となるCTkウィンドウ。
-            message: 表示する通知メッセージ。
-            level: 通知レベル ('success', 'skip', 'error', 'info')。
-            duration_ms: 通知を表示するミリ秒数。
-        """
+        """ToastNotification を初期化する。"""
         super().__init__(parent)
 
         self.parent = parent
@@ -77,7 +80,12 @@ class ToastNotification(ctk.CTkToplevel):
         self.after(self.duration_ms, self._dismiss)
 
     def _position_toast(self) -> None:
-        """親ウィンドウの下部中央にトーストを配置する。"""
+        """親ウィンドウの下部中央にトーストを配置する。
+
+        Returns
+        -------
+        None
+        """
         self.update_idletasks()
         req_width = self.winfo_reqwidth()
         req_height = self.winfo_reqheight()
@@ -100,7 +108,12 @@ class ToastNotification(ctk.CTkToplevel):
         self.geometry(f"+{pos_x}+{pos_y}")
 
     def _dismiss(self) -> None:
-        """トーストを破棄する。"""
+        """トーストを破棄する。
+
+        Returns
+        -------
+        None
+        """
         try:
             self.destroy()
         except Exception:
@@ -113,7 +126,24 @@ def show_toast(
     level: str = "info",
     duration_ms: int = 2500,
 ) -> Optional[ToastNotification]:
-    """トースト通知を表示するヘルパー関数。安全に例外をハンドリングする。"""
+    """トースト通知を表示するヘルパー関数。
+
+    Parameters
+    ----------
+    parent : ctk.CTk
+        親ウィンドウ。
+    message : str
+        通知メッセージ。
+    level : str, optional
+        通知レベル ('success', 'skip', 'error', 'info')。デフォルトは 'info'。
+    duration_ms : int, optional
+        表示ミリ秒数。デフォルトは 2500。
+
+    Returns
+    -------
+    Optional[ToastNotification]
+        生成された ToastNotification インスタンス。失敗時は None。
+    """
     try:
         return ToastNotification(parent, message, level=level, duration_ms=duration_ms)
     except Exception:

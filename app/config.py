@@ -13,7 +13,13 @@ DEFAULT_CONFIG_PATH = Path("config.json")
 
 
 def get_default_presets() -> Dict[str, Dict[str, Any]]:
-    """組み込みの初期プリセット辞書を生成して返す。"""
+    """組み込みの初期プリセット辞書を生成して返す。
+
+    Returns
+    -------
+    dict[str, dict[str, Any]]
+        プリセット名をキー、設定辞書を値とする辞書。
+    """
     return {
         "デフォルト": {
             "active_tab": "定型ルールモード",
@@ -66,7 +72,25 @@ def get_default_presets() -> Dict[str, Dict[str, Any]]:
 
 @dataclass
 class AppConfig:
-    """アプリケーションのユーザー設定モデル。"""
+    """アプリケーションのユーザー設定モデル。
+
+    Parameters
+    ----------
+    is_active : bool, optional
+        自動変換が有効かどうか。デフォルトは False。
+    active_tab : str, optional
+        起動時に選択されるタブ名。デフォルトは '定型ルールモード'。
+    hotkey : str, optional
+        トグル用グローバルホットキー。デフォルトは '<ctrl>+<alt>+x'。
+    hotkey_undo : str, optional
+        Undo用グローバルホットキー。デフォルトは '<ctrl>+<alt>+z'。
+    close_to_tray : bool, optional
+        ×ボタン押下時にタスクトレイへ格納するかどうか。デフォルトは True。
+    current_preset : str, optional
+        現在選択中のプリセット名。デフォルトは 'デフォルト'。
+    presets : dict[str, dict[str, Any]], optional
+        保存されたプリセット辞書。
+    """
 
     is_active: bool = False
     active_tab: str = "定型ルールモード"
@@ -125,13 +149,29 @@ class AppConfig:
     pad_dec_digits: int = 2
 
     def get_preset_names(self) -> List[str]:
-        """登録されているプリセット名の一覧を返す。"""
+        """登録されているプリセット名の一覧を返す。
+
+        Returns
+        -------
+        list[str]
+            プリセット名のリスト。
+        """
         if not self.presets:
             self.presets = get_default_presets()
         return list(self.presets.keys())
 
     def save_to_preset(self, preset_name: str) -> None:
-        """現在の設定値を指定プリセットとして保存・更新する。"""
+        """現在の設定値を指定プリセットとして保存・更新する。
+
+        Parameters
+        ----------
+        preset_name : str
+            保存先のプリセット名。
+
+        Returns
+        -------
+        None
+        """
         d = asdict(self)
         exclude_keys = {"presets", "current_preset", "is_active", "hotkey", "hotkey_undo", "close_to_tray"}
         preset_data = {k: v for k, v in d.items() if k not in exclude_keys}
@@ -139,7 +179,18 @@ class AppConfig:
         self.current_preset = preset_name
 
     def load_from_preset(self, preset_name: str) -> bool:
-        """指定プリセットの値を自身の設定に反映する。"""
+        """指定プリセットの値を自身の設定に反映する。
+
+        Parameters
+        ----------
+        preset_name : str
+            読み込み対象のプリセット名。
+
+        Returns
+        -------
+        bool
+            読み込みが成功した場合は True、プリセットが存在しない場合は False。
+        """
         if preset_name not in self.presets:
             return False
         preset_data = self.presets[preset_name]
@@ -151,7 +202,18 @@ class AppConfig:
         return True
 
     def delete_preset(self, preset_name: str) -> bool:
-        """指定プリセットを削除する（最後の1件は削除不可）。"""
+        """指定プリセットを削除する。
+
+        Parameters
+        ----------
+        preset_name : str
+            削除対象のプリセット名。
+
+        Returns
+        -------
+        bool
+            削除に成功した場合は True、最後の1件などで削除不可の場合は False。
+        """
         if preset_name in self.presets and len(self.presets) > 1:
             del self.presets[preset_name]
             if self.current_preset == preset_name:
@@ -162,7 +224,18 @@ class AppConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AppConfig":
-        """辞書データから安全にインスタンスを生成する（未知のキーは無視、欠落キーはデフォルト値）。"""
+        """辞書データから安全に AppConfig インスタンスを生成する。
+
+        Parameters
+        ----------
+        data : dict[str, Any]
+            JSON等から読み込まれた設定辞書。
+
+        Returns
+        -------
+        AppConfig
+            未知のキーは無視され、不足キーはデフォルト値で補完された設定インスタンス。
+        """
         field_names = set(cls.__dataclass_fields__.keys())
         filtered = {k: v for k, v in data.items() if k in field_names}
 
@@ -204,7 +277,18 @@ class AppConfig:
 
 
 def load_config(filepath: Union[str, Path] = DEFAULT_CONFIG_PATH) -> AppConfig:
-    """設定ファイル（JSON）から設定を読み込む。ファイルが存在しない場合はデフォルト設定を返す。"""
+    """設定ファイル（JSON）から設定を読み込む。
+
+    Parameters
+    ----------
+    filepath : Union[str, Path], optional
+        設定JSONファイルのパス。デフォルトは DEFAULT_CONFIG_PATH ('config.json')。
+
+    Returns
+    -------
+    AppConfig
+        読み込まれた設定オブジェクト。ファイルが存在しない場合や破損時はデフォルト設定。
+    """
     path = Path(filepath)
     if not path.exists():
         logger.info("Config file '%s' not found. Using default config.", path)
@@ -221,7 +305,20 @@ def load_config(filepath: Union[str, Path] = DEFAULT_CONFIG_PATH) -> AppConfig:
 
 
 def save_config(config: AppConfig, filepath: Union[str, Path] = DEFAULT_CONFIG_PATH) -> bool:
-    """設定をファイル（JSON）に書き込む。"""
+    """設定オブジェクトをファイル（JSON）に書き込む。
+
+    Parameters
+    ----------
+    config : AppConfig
+        保存する設定オブジェクト。
+    filepath : Union[str, Path], optional
+        保存先ファイルのパス。デフォルトは DEFAULT_CONFIG_PATH ('config.json')。
+
+    Returns
+    -------
+    bool
+        保存に成功した場合は True、失敗時は False。
+    """
     path = Path(filepath)
     try:
         data = asdict(config)

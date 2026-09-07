@@ -13,7 +13,12 @@ from app.ui.app_window import ClipboardTransformerApp
 
 
 def setup_logging() -> None:
-    """ロギングの初期設定を行う。"""
+    """ロギングの初期設定を行う。
+
+    Returns
+    -------
+    None
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] (%(name)s) %(message)s",
@@ -22,7 +27,12 @@ def setup_logging() -> None:
 
 
 def main() -> None:
-    """メイン実行関数。"""
+    """アプリケーションのメイン実行関数。ロギングを設定しGUIを起動する。
+
+    Returns
+    -------
+    None
+    """
     setup_logging()
     logger = logging.getLogger("ClipFormatter")
     logger.info("ClipFormatter を起動しています...")

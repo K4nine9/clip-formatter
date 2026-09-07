@@ -34,12 +34,29 @@ class PresetTabFrame(ctk.CTkFrame):
     }
 
     def __init__(self, master, config: AppConfig, **kwargs):
+        """PresetTabFrame を初期化する。
+
+        Parameters
+        ----------
+        master : Any
+            親ウィジェット。
+        config : AppConfig
+            設定オブジェクト。
+        **kwargs : Any
+            CTkFrame に渡す追加引数。
+        """
         super().__init__(master, fg_color="transparent", **kwargs)
         self.config = config
         self._build_ui()
         self.load_from_config(config)
 
     def _build_ui(self) -> None:
+        """定型ルールタブの各設定UIウィジェットを構築・配置する。
+
+        Returns
+        -------
+        None
+        """
         # =======================================================
         # 1. 整数部（小数点以上）ルール
         # =======================================================
@@ -226,19 +243,53 @@ class PresetTabFrame(ctk.CTkFrame):
         self._update_entry_states()
 
     def _on_int_mode_changed(self) -> None:
+        """整数部モード（変更なし/ゼロ埋め）のラジオボタンが変更されたときのハンドラ。
+
+        Returns
+        -------
+        None
+        """
         self._update_entry_states()
 
     def _on_dec_mode_changed(self) -> None:
+        """小数部モード（変更なし/丸め/ゼロ埋め）のラジオボタンが変更されたときのハンドラ。
+
+        Returns
+        -------
+        None
+        """
         self._update_entry_states()
 
     def _on_overflow_changed(self, choice: str) -> None:
+        """小数超過時処理（四捨五入/切り捨て）が選択されたときのハンドラ。
+
+        Parameters
+        ----------
+        choice : str
+            選択されたラベル ('四捨五入' または '切り捨て')。
+
+        Returns
+        -------
+        None
+        """
         pass
 
     def _on_col_toggled(self) -> None:
+        """列抽出チェックボックスがトグルされたときのハンドラ。
+
+        Returns
+        -------
+        None
+        """
         self._update_entry_states()
 
     def _update_entry_states(self) -> None:
-        """現在の選択状態に応じて各入力エントリの活性/非活性を切り替える。"""
+        """現在の選択状態に応じて各入力エントリの活性/非活性を切り替える。
+
+        Returns
+        -------
+        None
+        """
         # 整数部
         int_state = "normal" if self.int_mode_var.get() == self.INT_PAD else "disabled"
         self.int_digits_entry.configure(state=int_state)
@@ -254,7 +305,17 @@ class PresetTabFrame(ctk.CTkFrame):
         self.col_indices_entry.configure(state=col_state)
 
     def load_from_config(self, config: AppConfig) -> None:
-        """設定値からUI状態を初期化する。"""
+        """設定オブジェクトからUI状態を初期化・同期する。
+
+        Parameters
+        ----------
+        config : AppConfig
+            設定データモデル。
+
+        Returns
+        -------
+        None
+        """
         int_mode = getattr(config, "int_mode", self.INT_NONE)
         int_digits = getattr(config, "int_digits", 3)
         dec_mode = getattr(config, "dec_mode", self.DEC_ROUND)
@@ -288,7 +349,17 @@ class PresetTabFrame(ctk.CTkFrame):
         self._update_entry_states()
 
     def save_to_config(self, config: AppConfig) -> None:
-        """現在のUI状態を設定モデルへ保存する。"""
+        """現在のUI状態を設定モデルへ保存する。
+
+        Parameters
+        ----------
+        config : AppConfig
+            保存先の設定データモデル。
+
+        Returns
+        -------
+        None
+        """
         int_mode = self.int_mode_var.get()
         dec_mode = self.dec_mode_var.get()
         dec_overflow = self.OVERFLOW_LABEL_MAP.get(
@@ -323,7 +394,13 @@ class PresetTabFrame(ctk.CTkFrame):
         config.unwrap_enabled = self.unwrap_enabled_var.get()
 
     def get_transformer(self) -> Optional[PresetTransformer]:
-        """現在のUI入力から PresetTransformer インスタンスを構築して返す。"""
+        """現在のUI入力から PresetTransformer インスタンスを構築して返す。
+
+        Returns
+        -------
+        Optional[PresetTransformer]
+            有効な定型ルールが存在する場合は PresetTransformer、無効な場合は None。
+        """
         int_mode = self.int_mode_var.get()
         dec_mode = self.dec_mode_var.get()
         dec_overflow = self.OVERFLOW_LABEL_MAP.get(

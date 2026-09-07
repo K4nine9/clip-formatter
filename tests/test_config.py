@@ -12,19 +12,43 @@ class TestConfig(unittest.TestCase):
     """設定読み書きのテスト"""
 
     def setUp(self):
+        """テスト用の一時ディレクトリと設定ファイルパスを初期化する。
+
+        Returns
+        -------
+        None
+        """
         self.temp_dir = tempfile.TemporaryDirectory()
         self.config_path = Path(self.temp_dir.name) / "config.json"
 
     def tearDown(self):
+        """テスト用の一時ディレクトリを破棄する。
+
+        Returns
+        -------
+        None
+        """
         self.temp_dir.cleanup()
 
     def test_load_default_when_missing(self):
+        """設定ファイルが存在しない場合にデフォルト設定が読み込まれることを検証する。
+
+        Returns
+        -------
+        None
+        """
         cfg = load_config(self.config_path)
         self.assertEqual(cfg.round_digits, 2)
         self.assertFalse(cfg.is_active)
         self.assertEqual(cfg.hotkey, "<ctrl>+<alt>+x")
 
     def test_save_and_reload(self):
+        """AppConfig の保存と復元が正しく動作することを検証する。
+
+        Returns
+        -------
+        None
+        """
         cfg = AppConfig(
             is_active=True,
             active_tab="プログラマブルモード",
@@ -57,6 +81,12 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(loaded.prog_delimiter, "\t")
 
     def test_backward_compat_truncate_dec_mode(self):
+        """過去バージョンの dec_mode='truncate' 設定が後方互換で復元されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         # 過去設定で dec_mode が "truncate" だった場合、dec_mode="round" かつ dec_overflow="truncate" に変換される
         old_data = {
             "is_active": False,
@@ -72,6 +102,12 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(loaded.dec_digits, 4)
 
     def test_preset_operations(self):
+        """プリセットの新規保存、一覧取得、切り替え、削除の動作を検証する。
+
+        Returns
+        -------
+        None
+        """
         cfg = AppConfig()
         names = cfg.get_preset_names()
         self.assertIn("デフォルト", names)
@@ -99,6 +135,12 @@ class TestConfig(unittest.TestCase):
         self.assertNotIn("実験用", cfg.get_preset_names())
 
     def test_latex_config_save_reload(self):
+        """LaTeXモード固有の設定が保存および復元されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         cfg = AppConfig(
             active_tab="LaTeXモード",
             latex_mode="table",
@@ -123,6 +165,12 @@ class TestConfig(unittest.TestCase):
         self.assertFalse(loaded.close_to_tray)
 
     def test_load_corrupted_file_falls_back_to_default(self):
+        """破損したJSONファイルを読み込んだ際に安全にデフォルト設定にフォールバックすることを検証する。
+
+        Returns
+        -------
+        None
+        """
         with open(self.config_path, "w", encoding="utf-8") as f:
             f.write("invalid json content")
 

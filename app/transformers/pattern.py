@@ -9,7 +9,15 @@ from app.transformers.base import BaseTransformer, TransformResult
 
 @dataclass(frozen=True)
 class PatternToken:
-    """パターンの構文要素（リテラル文字列または変数）。"""
+    """パターンの構文要素（リテラル文字列または変数）。
+
+    Parameters
+    ----------
+    is_var : bool
+        変数トークンであるかどうか（True の場合は変数名、False の場合はリテラル文字列）。
+    content : str
+        トークンの内容（変数名またはリテラル文字列）。
+    """
 
     is_var: bool
     content: str
@@ -18,13 +26,25 @@ class PatternToken:
 def tokenize_pattern(pattern_str: str) -> List[PatternToken]:
     """パターン文字列を解析し、リテラルと変数のトークン列に分解する。
 
-    エスケープ仕様:
-        - `\\{` -> リテラル `{`
-        - `\\}` -> リテラル `}`
-        - `\\\\` -> リテラル `\\`
-        - `{{` -> リテラル `{`
-        - `}}` -> リテラル `}`
-        - `{変数名}` -> 変数トークン
+    Parameters
+    ----------
+    pattern_str : str
+        解析対象のパターン文字列（例: '私は{a}時間で{b}つのりんご'）。
+
+    Returns
+    -------
+    list[PatternToken]
+        解析されたトークン列のリスト。
+
+    Notes
+    -----
+    以下のエスケープシーケンスをサポートしています:
+    - `\\{` -> リテラル `{`
+    - `\\}` -> リテラル `}`
+    - `\\\\` -> リテラル `\\`
+    - `{{` -> リテラル `{`
+    - `}}` -> リテラル `}`
+    - `{変数名}` -> 変数トークン
     """
     tokens: List[PatternToken] = []
     i = 0
@@ -32,6 +52,12 @@ def tokenize_pattern(pattern_str: str) -> List[PatternToken]:
     literal_buf: List[str] = []
 
     def flush_literal():
+        """バッファに蓄積されたリテラル文字列をトークンとして確定し、バッファをクリアする。
+
+        Returns
+        -------
+        None
+        """
         if literal_buf:
             tokens.append(PatternToken(is_var=False, content="".join(literal_buf)))
             literal_buf.clear()
@@ -84,18 +110,23 @@ def tokenize_pattern(pattern_str: str) -> List[PatternToken]:
 class PatternTransformer(BaseTransformer):
     """入力パターンにマッチする箇所を変数キャプチャし、出力テンプレートに従って並び替え・置換する変換器。
 
-    例:
-        - 入力パターン: "私は{a}時間で{b}つのりんごを食べました"
-        - 出力テンプレート: "私は{b}時間で{a}つのりんごを食べました"
-        - 対象テキスト: "私は1時間で2つのりんごを食べました"
-        - 変換後: "私は2時間で1つのりんごを食べました"
+    Parameters
+    ----------
+    input_pattern : str
+        入力マッチングパターン（変数 `{var}` およびエスケープ対応）。
+    output_template : str
+        出力テンプレート（変数 `{var}` およびエスケープ対応）。
     """
 
     def __init__(self, input_pattern: str, output_template: str):
-        """
-        Args:
-            input_pattern: 入力マッチングパターン（変数 `{var}` およびエスケープ対応）。
-            output_template: 出力テンプレート（変数 `{var}` およびエスケープ対応）。
+        """PatternTransformer を初期化する。
+
+        Parameters
+        ----------
+        input_pattern : str
+            入力マッチングパターン。
+        output_template : str
+            出力テンプレート。
         """
         self.raw_input_pattern = input_pattern
         self.raw_output_template = output_template
@@ -132,6 +163,18 @@ class PatternTransformer(BaseTransformer):
         self.undefined_vars = self.output_vars - self.defined_vars
 
     def transform(self, text: str) -> TransformResult:
+        """入力テキストに対してパターンマッチ置換を実行する。
+
+        Parameters
+        ----------
+        text : str
+            置換対象のテキスト。
+
+        Returns
+        -------
+        TransformResult
+            置換結果オブジェクト。マッチしない場合や未定義変数がある場合はスキップ。
+        """
         if not text:
             return TransformResult.unchanged(text, "入力テキストが空です")
 
@@ -155,6 +198,18 @@ class PatternTransformer(BaseTransformer):
             )
 
         def _replace_match(m: re.Match) -> str:
+            """正規表現のマッチオブジェクトから変数を抽出し、出力トークン列に代入して置換後文字列を生成する。
+
+            Parameters
+            ----------
+            m : re.Match
+                パターン一致箇所を表すマッチオブジェクト。
+
+            Returns
+            -------
+            str
+                変数が展開された置換後文字列。
+            """
             # キャプチャされた変数の辞書を作成
             var_dict: Dict[str, str] = {}
             for idx, var_name in self.var_id_mapping.items():

@@ -16,6 +16,12 @@ class TestProgrammableTabFrame(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """テストクラス全体の初期化を行い、ヘッドレス環境でのTkinterインスタンスを生成する。
+
+        Returns
+        -------
+        None
+        """
         # ヘッドレス環境での Tkinter 初期化テスト
         try:
             cls.root = ctk.CTk()
@@ -25,15 +31,33 @@ class TestProgrammableTabFrame(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        """テストクラス全体の終了処理を行い、Tkinterインスタンスを破棄する。
+
+        Returns
+        -------
+        None
+        """
         if cls.root:
             cls.root.destroy()
 
     def setUp(self):
+        """各テストケース実行前の事前準備を行い、GUIが利用不可の場合はスキップする。
+
+        Returns
+        -------
+        None
+        """
         if not self.root:
             self.skipTest("GUI display not available")
         self.config = AppConfig()
 
     def test_get_transformer_pattern_mode(self):
+        """パターン置換モードで正しく PatternTransformer が生成されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         self.config.prog_mode = "pattern"
         self.config.prog_pattern_input = "私は{a}時間"
         self.config.prog_pattern_output = "私は{a}分"
@@ -46,6 +70,12 @@ class TestProgrammableTabFrame(unittest.TestCase):
         self.assertEqual(res.text, "私は2分")
 
     def test_get_transformer_delimiter_mode(self):
+        """区切り文字モードで正しく TemplateTransformer が生成されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         self.config.prog_mode = "delimiter"
         self.config.prog_delimiter = ","
         self.config.prog_input_vars = "a, b"
@@ -59,6 +89,12 @@ class TestProgrammableTabFrame(unittest.TestCase):
         self.assertEqual(res.text, "bar-foo")
 
     def test_get_transformer_script_mode_pattern(self):
+        """スクリプトモード（パターン入力）で PythonScriptTransformer が正しく生成されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         self.config.prog_mode = "script"
         self.config.prog_script_input_mode = "pattern"
         self.config.prog_script_pattern = "単価{price}円、数量{qty}個"
@@ -72,6 +108,12 @@ class TestProgrammableTabFrame(unittest.TestCase):
         self.assertEqual(res.text, "600円")
 
     def test_get_transformer_script_mode_full_text(self):
+        """スクリプトモード（全文入力）で PythonScriptTransformer が正しく生成されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         self.config.prog_mode = "script"
         self.config.prog_script_input_mode = "full_text"
         self.config.prog_script_code = "result = f'行数: {len(lines)}'"
@@ -84,6 +126,12 @@ class TestProgrammableTabFrame(unittest.TestCase):
         self.assertEqual(res.text, "行数: 3")
 
     def test_sample_insertion(self):
+        """サンプルスクリプト選択時にエディタへサンプルコードが正しく挿入されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         frame = ProgrammableTabFrame(self.root, self.config)
         sample_key = "四則演算・金額計算"
         frame._on_sample_selected(sample_key)

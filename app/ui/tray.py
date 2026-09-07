@@ -13,13 +13,19 @@ logger = logging.getLogger(__name__)
 
 
 def create_tray_icon_image() -> Image.Image:
-    """トレイ表示用のクリップボード風アイコン画像を生成する。"""
+    """トレイ表示用のクリップボード風アイコン画像を動的に生成する。
+
+    Returns
+    -------
+    PIL.Image.Image
+        64x64ピクセルのRGBAアイコン画像。
+    """
     width = 64
     height = 64
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
-    # クリップボード本体（青紫色の角丸四角形）
+    # クリップボード本体（青色の角丸四角形）
     draw.rounded_rectangle(
         [(10, 14), (54, 58)],
         radius=6,
@@ -28,7 +34,7 @@ def create_tray_icon_image() -> Image.Image:
         width=2,
     )
 
-    # クリップ部分（上部の金具）
+    # クリップ金具部分
     draw.rounded_rectangle(
         [(22, 6), (42, 18)],
         radius=3,
@@ -37,7 +43,7 @@ def create_tray_icon_image() -> Image.Image:
         width=2,
     )
 
-    # 用紙の線（テキストを模した白い横線）
+    # 用紙の線（白い横線）
     draw.line([(18, 26), (46, 26)], fill=(255, 255, 255, 240), width=3)
     draw.line([(18, 36), (46, 36)], fill=(255, 255, 255, 240), width=3)
     draw.line([(18, 46), (36, 46)], fill=(255, 255, 255, 240), width=3)
@@ -46,15 +52,28 @@ def create_tray_icon_image() -> Image.Image:
 
 
 class SystemTrayManager:
-    """システムトレイ（タスクトレイ）常駐とコンテキストメニューを管理するクラス。"""
+    """システムトレイ（タスクトレイ）常駐と右クリックメニューを管理するクラス。
+
+    Parameters
+    ----------
+    app : ClipboardTransformerApp
+        メインアプリケーションインスタンス。
+    """
 
     def __init__(self, app: "ClipboardTransformerApp"):
+        """SystemTrayManager を初期化する。"""
         self.app = app
         self._icon: Optional[pystray.Icon] = None
         self._thread: Optional[threading.Thread] = None
 
     def _create_menu(self) -> pystray.Menu:
-        """トレイアイコンの右クリックメニューを構築する。"""
+        """トレイアイコンの右クリックメニューを構築する。
+
+        Returns
+        -------
+        pystray.Menu
+            構築されたメニューオブジェクト。
+        """
         return pystray.Menu(
             pystray.MenuItem(
                 "ウィンドウを表示",
@@ -74,21 +93,62 @@ class SystemTrayManager:
         )
 
     def _on_show_window(self, icon=None, item=None) -> None:
-        """メインウィンドウを最前面に再表示する。"""
+        """メインウィンドウを最前面に再表示する。
+
+        Parameters
+        ----------
+        icon : Optional[pystray.Icon], optional
+            イベント呼び出し元のアイコン。
+        item : Optional[pystray.MenuItem], optional
+            クリックされたメニュー項目。
+
+        Returns
+        -------
+        None
+        """
         self.app.after(0, self.app.show_window)
 
     def _on_toggle_active(self, icon=None, item=None) -> None:
-        """トレイメニューから自動変換の有効/無効を切り替える。"""
+        """トレイメニューから自動変換の有効/無効を切り替える。
+
+        Parameters
+        ----------
+        icon : Optional[pystray.Icon], optional
+            イベント呼び出し元のアイコン。
+        item : Optional[pystray.MenuItem], optional
+            クリックされたメニュー項目。
+
+        Returns
+        -------
+        None
+        """
         self.app.after(0, self.app.toggle_active)
 
     def _on_quit(self, icon=None, item=None) -> None:
-        """アプリケーションを完全に終了する。"""
+        """アプリケーションを完全に終了する。
+
+        Parameters
+        ----------
+        icon : Optional[pystray.Icon], optional
+            イベント呼び出し元のアイコン。
+        item : Optional[pystray.MenuItem], optional
+            クリックされたメニュー項目。
+
+        Returns
+        -------
+        None
+        """
         logger.info("Quit requested from system tray.")
         self.stop()
         self.app.after(0, self.app.really_quit)
 
     def start(self) -> None:
-        """システムトレイ常駐を開始する。"""
+        """システムトレイ常駐をバックグラウンドスレッドで開始する。
+
+        Returns
+        -------
+        None
+        """
         if self._icon is not None:
             return
 
@@ -112,12 +172,22 @@ class SystemTrayManager:
             self._icon = None
 
     def update_state(self) -> None:
-        """アイコンのメニュー状態（チェック状態等）を更新する。"""
+        """アイコンのメニュー状態（チェック状態等）を更新する。
+
+        Returns
+        -------
+        None
+        """
         if self._icon:
             self._icon.update_menu()
 
     def stop(self) -> None:
-        """トレイアイコンを停止・消去する。"""
+        """トレイアイコンを安全に停止・消去する。
+
+        Returns
+        -------
+        None
+        """
         if self._icon is not None:
             try:
                 self._icon.stop()

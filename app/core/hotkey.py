@@ -9,7 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 class GlobalHotkeyListener:
-    """システム全体のキーボード入力を監視し、指定ホットキーでコールバックを実行するリスナー。"""
+    """システム全体のキーボード入力を監視し、指定ホットキーでコールバックを実行するリスナー。
+
+    Parameters
+    ----------
+    hotkey_str : str, optional
+        トグル用ホットキー文字列（例: '<ctrl>+<alt>+x'）。デフォルトは '<ctrl>+<alt>+x'。
+    on_triggered_callback : Optional[Callable[[], None]], optional
+        トグル押下時に呼び出すコールバック関数。デフォルトは None。
+    undo_hotkey_str : Optional[str], optional
+        Undo用ホットキー文字列（例: '<ctrl>+<alt>+z'）。デフォルトは '<ctrl>+<alt>+z'。
+    on_undo_callback : Optional[Callable[[], None]], optional
+        Undo押下時に呼び出すコールバック関数。デフォルトは None。
+    """
 
     DEFAULT_HOTKEY = "<ctrl>+<alt>+x"
     DEFAULT_UNDO_HOTKEY = "<ctrl>+<alt>+z"
@@ -21,13 +33,7 @@ class GlobalHotkeyListener:
         undo_hotkey_str: Optional[str] = DEFAULT_UNDO_HOTKEY,
         on_undo_callback: Optional[Callable[[], None]] = None,
     ):
-        """
-        Args:
-            hotkey_str: トグル用ホットキー文字列（例: '<ctrl>+<alt>+x'）。
-            on_triggered_callback: トグル押下時に呼び出すコールバック関数。
-            undo_hotkey_str: Undo用ホットキー文字列（例: '<ctrl>+<alt>+z'）。
-            on_undo_callback: Undo押下時に呼び出すコールバック関数。
-        """
+        """GlobalHotkeyListener を初期化する。"""
         self.hotkey_str = hotkey_str
         self.on_triggered_callback = on_triggered_callback
         self.undo_hotkey_str = undo_hotkey_str
@@ -36,7 +42,12 @@ class GlobalHotkeyListener:
         self._thread: Optional[threading.Thread] = None
 
     def _on_hotkey_activated(self) -> None:
-        """トグル用ホットキーが検知されたときに実行される内部メソッド。"""
+        """トグル用ホットキーが検知されたときに実行される内部ハンドラ。
+
+        Returns
+        -------
+        None
+        """
         logger.info("Global hotkey triggered: %s", self.hotkey_str)
         if self.on_triggered_callback:
             try:
@@ -45,7 +56,12 @@ class GlobalHotkeyListener:
                 logger.error("Error in hotkey callback: %s", e, exc_info=True)
 
     def _on_undo_activated(self) -> None:
-        """Undo用ホットキーが検知されたときに実行される内部メソッド。"""
+        """Undo用ホットキーが検知されたときに実行される内部ハンドラ。
+
+        Returns
+        -------
+        None
+        """
         logger.info("Global undo hotkey triggered: %s", self.undo_hotkey_str)
         if self.on_undo_callback:
             try:
@@ -54,7 +70,12 @@ class GlobalHotkeyListener:
                 logger.error("Error in undo hotkey callback: %s", e, exc_info=True)
 
     def start(self) -> None:
-        """ホットキーリスナーをバックグラウンドスレッドで起動する。"""
+        """ホットキーリスナーをバックグラウンドスレッドで起動する。
+
+        Returns
+        -------
+        None
+        """
         if self._listener is not None:
             logger.warning("Hotkey listener is already running.")
             return
@@ -75,7 +96,12 @@ class GlobalHotkeyListener:
             self._listener = None
 
     def stop(self) -> None:
-        """ホットキーリスナーを停止する。"""
+        """ホットキーリスナーを安全に停止する。
+
+        Returns
+        -------
+        None
+        """
         if self._listener is not None:
             try:
                 self._listener.stop()

@@ -9,13 +9,14 @@ from app.transformers.base import BaseTransformer, TransformResult
 class TemplateTransformer(BaseTransformer):
     """入力文字列を指定区切り文字でパースし、定義された変数にバインドしてテンプレートへ展開する変換器。
 
-    SPEC:
-        - 入力フォーマット: 区切り文字と変数名列（例: 'a, b, c, d, e'）
-        - 出力テンプレート: '{e}, {b}, {c}, {d}, {a}'
-        - バリデーション & スキップ:
-            - 要素数が一致しない場合は変換を実行せずスキップ
-            - テンプレート内に未定義の変数が存在する場合はスキップ
-            - 複数行データに対応（全行の要素数が一致する必要がある）
+    Parameters
+    ----------
+    var_names : Union[Sequence[str], str]
+        変数名のシーケンス、またはカンマ区切りの変数名文字列。
+    template : str
+        '{変数名}' を含む出力フォーマット文字列。
+    delimiter : str, optional
+        入力データの列区切り文字。デフォルトは ','。
     """
 
     def __init__(
@@ -24,11 +25,16 @@ class TemplateTransformer(BaseTransformer):
         template: str,
         delimiter: str = ",",
     ):
-        """
-        Args:
-            var_names: 変数名のシーケンス、またはカンマ区切りの変数名文字列。
-            template: '{変数名}' を含むフォーマット文字列。
-            delimiter: 入力データの列区切り文字。
+        """TemplateTransformer を初期化する。
+
+        Parameters
+        ----------
+        var_names : Union[Sequence[str], str]
+            変数名のリストまたはカンマ/区切り文字で区切られた文字列。
+        template : str
+            展開対象のテンプレート文字列。
+        delimiter : str, optional
+            区切り文字。デフォルトは ','。
         """
         if isinstance(var_names, str):
             self.var_names = self.parse_var_names(var_names, delimiter)
@@ -43,8 +49,20 @@ class TemplateTransformer(BaseTransformer):
 
     @staticmethod
     def parse_var_names(raw_str: str, delimiter: str = ",") -> List[str]:
-        """区切り文字で区切られた文字列から変数名リストを抽出する。"""
-        # カンマまたは指定delimiterで柔軟に分割
+        """区切り文字で区切られた文字列から変数名リストを抽出する。
+
+        Parameters
+        ----------
+        raw_str : str
+            変数名が並んだ未加工の文字列（例: 'a, b, c' または 'col1\tcol2'）。
+        delimiter : str, optional
+            区切り文字。デフォルトは ','。
+
+        Returns
+        -------
+        list[str]
+            空白がトリムされた変数名のリスト。
+        """
         if delimiter != "," and delimiter in raw_str:
             parts = [p.strip() for p in raw_str.split(delimiter) if p.strip()]
         elif "," in raw_str:
@@ -55,7 +73,18 @@ class TemplateTransformer(BaseTransformer):
 
     @staticmethod
     def _extract_template_variables(template_str: str) -> List[str]:
-        """string.Formatter を使用してテンプレート内で参照されているフィールド名を抽出する。"""
+        """string.Formatter を使用してテンプレート内で参照されているフィールド名を抽出する。
+
+        Parameters
+        ----------
+        template_str : str
+            解析対象のフォーマット文字列。
+
+        Returns
+        -------
+        list[str]
+            テンプレート内で参照されている基底変数名のリスト。
+        """
         formatter = string.Formatter()
         referenced = []
         try:
@@ -69,6 +98,23 @@ class TemplateTransformer(BaseTransformer):
         return referenced
 
     def transform(self, text: str) -> TransformResult:
+        """入力テキストを行ごとに分割し、各行を変数にマッピングしてテンプレートへ展開する。
+
+        Parameters
+        ----------
+        text : str
+            区切り文字で記述された複数行テキスト。
+
+        Returns
+        -------
+        TransformResult
+            テンプレート展開後の結果オブジェクト。要素数不一致や未定義変数の場合はスキップ。
+
+        Notes
+        -----
+        - 空行はそのまま保持されます。
+        - 1行でも要素数が定義変数数と一致しない場合、誤変換を防ぐため全体がスキップされます。
+        """
         if not text or not text.strip():
             return TransformResult.unchanged(text, "入力テキストが空です")
 

@@ -10,9 +10,21 @@ class TestTextUnwrapTransformer(unittest.TestCase):
     """TextUnwrapTransformer の単体テスト"""
 
     def setUp(self):
+        """テスト用の TextUnwrapTransformer インスタンスを初期化する。
+
+        Returns
+        -------
+        None
+        """
         self.transformer = TextUnwrapTransformer()
 
     def test_english_newline_removal(self):
+        """英文中の単一改行が半角スペースで結合されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         # 英文の単一改行が半角スペースで結合される
         text = "Recent advances in deep learning\nhave enabled significant improvements\nin natural language processing."
         res = self.transformer.transform(text)
@@ -23,6 +35,12 @@ class TestTextUnwrapTransformer(unittest.TestCase):
         )
 
     def test_hyphen_dehyphenation(self):
+        """行末のハイフン分断単語が正しく1単語に結合されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         # 行末のハイフン分断が結合される
         text = "Deep neural networks are cap-\nable of learning complex repre-\nsentations from data."
         res = self.transformer.transform(text)
@@ -33,6 +51,12 @@ class TestTextUnwrapTransformer(unittest.TestCase):
         )
 
     def test_paragraphs_preserved(self):
+        """空行で区切られた段落構造が保持されたまま各段落内の改行が結合されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         # 空行区切りの段落構造は保持される
         text = (
             "Paragraph one line one\n"
@@ -49,6 +73,12 @@ class TestTextUnwrapTransformer(unittest.TestCase):
         self.assertEqual(res.text, expected)
 
     def test_japanese_smart_joining(self):
+        """和文文字同士の行末改行において余計なスペースを挟まず結合されることを検証する。
+
+        Returns
+        -------
+        None
+        """
         # 和文同士の行末改行は半角スペースなしで直接結合される
         text = "近年、深層学習技術の\n急速な発展により、自然言語処理の\n精度が大幅に向上しました。"
         res = self.transformer.transform(text)
@@ -59,6 +89,12 @@ class TestTextUnwrapTransformer(unittest.TestCase):
         )
 
     def test_preset_transformer_with_unwrap(self):
+        """PresetTransformer に unwrap が組み込まれた場合の複合変換動作を検証する。
+
+        Returns
+        -------
+        None
+        """
         # PresetTransformer への統合動作
         pt = PresetTransformer(
             unwrap_enabled=True,

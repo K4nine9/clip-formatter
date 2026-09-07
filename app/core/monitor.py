@@ -11,16 +11,25 @@ logger = logging.getLogger(__name__)
 class ClipboardMonitor:
     """クリップボードの変更を監視し、新規テキストの検知・自作書き換えループ防止を行うクラス。
 
-    SPEC:
-        - 自プロセスがクリップボードを上書きした際、同一テキストを再検知して無限ループに陥ることを防ぐ。
-        - クリップボードのOSロック競合時は例外を握りつぶして次回に再試行。
-        - テキスト以外のデータはスキップ。
+    Parameters
+    ----------
+    on_change_callback : Optional[Callable[[str], None]], optional
+        新しいテキストが検知された際に呼び出されるコールバック関数。デフォルトは None。
+
+    Notes
+    -----
+    - 自プロセスがクリップボードを上書きした際、同一テキストを再検知して無限ループに陥ることを防ぎます。
+    - OSのクリップボードロック競合時の例外は握りつぶして次回ポーリング時に再試行します。
+    - 画像等の非テキストデータは安全にスキップされます。
     """
 
     def __init__(self, on_change_callback: Optional[Callable[[str], None]] = None):
-        """
-        Args:
-            on_change_callback: 新しいテキストが検知された際に呼び出されるコールバック関数。
+        """ClipboardMonitor を初期化する。
+
+        Parameters
+        ----------
+        on_change_callback : Optional[Callable[[str], None]], optional
+            新規クリップボードテキスト検知時のコールバック。デフォルトは None。
         """
         self.on_change_callback = on_change_callback
         self._last_read_hash: Optional[str] = None
@@ -30,21 +39,48 @@ class ClipboardMonitor:
 
     @staticmethod
     def _compute_hash(text: str) -> str:
-        """テキストのSHA-256ハッシュ値を計算する。"""
+        """テキストのSHA-256ハッシュ値を計算する。
+
+        Parameters
+        ----------
+        text : str
+            ハッシュ計算対象のテキスト。
+
+        Returns
+        -------
+        str
+            SHA-256 16進数ハッシュ文字列。
+        """
         return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
 
     def record_written_text(self, text: str) -> None:
-        """自プロセスがクリップボードに書き込んだテキストを記録し、次回検知ループを防止する。"""
+        """自プロセスがクリップボードに書き込んだテキストを記録し、次回検知ループを防止する。
+
+        Parameters
+        ----------
+        text : str
+            書き込んだテキスト。
+
+        Returns
+        -------
+        None
+        """
         h = self._compute_hash(text)
         self._last_written_hash = h
         self._last_read_hash = h
         self._last_read_text = text
 
     def check_clipboard(self) -> Optional[str]:
-        """クリップボードの内容を1回チェックする。
+        """クリップボードの内容を1回チェックし、新規テキストがあれば取得する。
 
-        新しいテキストが検知された場合、そのテキストを返し、コールバックが設定されていれば実行する。
-        同一テキスト、自作書き込み、非テキスト、またはアクセスエラーの場合は None を返す。
+        Returns
+        -------
+        Optional[str]
+            新しく検知されたテキスト。同一テキスト、自作書き込み、非テキスト、エラー時は None。
+
+        Notes
+        -----
+        新規テキストが検知された場合、`on_change_callback` が設定されていれば実行されます。
         """
         try:
             content = pyperclip.paste()
@@ -77,8 +113,15 @@ class ClipboardMonitor:
     def write_clipboard(self, text: str) -> bool:
         """クリップボードにテキストを書き込み、直前書き込みキャッシュを更新する。
 
-        Returns:
-            bool: 書き込みに成功したかどうか。
+        Parameters
+        ----------
+        text : str
+            クリップボードへ書き込むテキスト。
+
+        Returns
+        -------
+        bool
+            書き込みに成功したかどうか。
         """
         try:
             self.record_written_text(text)
@@ -91,8 +134,10 @@ class ClipboardMonitor:
     def undo(self) -> Optional[str]:
         """直前の変換前テキストをクリップボードに復元する。
 
-        Returns:
-            Optional[str]: 復元された元のテキスト。復元対象がない場合は None。
+        Returns
+        -------
+        Optional[str]
+            復元された元のテキスト。復元対象が存在しない場合は None。
         """
         if not self._last_original_text:
             return None
@@ -103,5 +148,11 @@ class ClipboardMonitor:
         return None
 
     def can_undo(self) -> bool:
-        """元に戻せるテキストが存在するかどうかを返す。"""
+        """元に戻せるテキストが存在するかどうかを判定する。
+
+        Returns
+        -------
+        bool
+            Undo 可能なテキストがキャッシュにあれば True、なければ False。
+        """
         return bool(self._last_original_text)

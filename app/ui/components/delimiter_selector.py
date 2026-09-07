@@ -5,7 +5,19 @@ import customtkinter as ctk
 
 
 class DelimiterSelector(ctk.CTkFrame):
-    """基本記号（カンマ、タブ、空白、コロン等）のドロップダウンおよびカスタム入力フレーム。"""
+    """基本記号（カンマ、タブ、空白、コロン等）のドロップダウンおよびカスタム入力フレーム。
+
+    Parameters
+    ----------
+    master : Any
+        親ウィジェット。
+    default_delimiter : str, optional
+        初期選択される区切り文字。デフォルトは ','。
+    on_changed : Optional[Callable[[str], None]], optional
+        選択または入力が変更された際に呼び出されるコールバック。デフォルトは None。
+    **kwargs : Any
+        CTkFrame に渡す追加引数。
+    """
 
     DELIM_MAP = {
         "カンマ (,)": ",",
@@ -27,6 +39,7 @@ class DelimiterSelector(ctk.CTkFrame):
         on_changed: Optional[Callable[[str], None]] = None,
         **kwargs,
     ):
+        """DelimiterSelector を初期化する。"""
         super().__init__(master, fg_color="transparent", **kwargs)
         self.on_changed = on_changed
 
@@ -44,6 +57,17 @@ class DelimiterSelector(ctk.CTkFrame):
         self.set_delimiter(default_delimiter)
 
     def _on_option_selected(self, choice: str) -> None:
+        """ドロップダウンメニューの項目が選択されたときのハンドラ。
+
+        Parameters
+        ----------
+        choice : str
+            選択されたメニュー項目表示名。
+
+        Returns
+        -------
+        None
+        """
         if choice == "その他 (カスタム)":
             self.custom_entry.configure(state="normal")
             self.custom_entry.focus()
@@ -54,7 +78,13 @@ class DelimiterSelector(ctk.CTkFrame):
             self.on_changed(self.get_delimiter())
 
     def get_delimiter(self) -> str:
-        """現在選択・入力されている区切り文字列を返す。"""
+        """現在選択・入力されている区切り文字列を取得する。
+
+        Returns
+        -------
+        str
+            実際の区切り文字（タブ文字 `\\t` やカンマ `,` など）。
+        """
         choice = self.opt_menu.get()
         if choice == "その他 (カスタム)":
             val = self.custom_entry.get()
@@ -62,7 +92,17 @@ class DelimiterSelector(ctk.CTkFrame):
         return self.DELIM_MAP.get(choice, ",")
 
     def set_delimiter(self, delim: str) -> None:
-        """外部から区切り文字を設定してUIを同期する。"""
+        """外部から区切り文字を設定してドロップダウンと入力欄を同期する。
+
+        Parameters
+        ----------
+        delim : str
+            設定する区切り文字。
+
+        Returns
+        -------
+        None
+        """
         if delim in self.REVERSE_MAP:
             label = self.REVERSE_MAP[delim]
             self.opt_menu.set(label)
@@ -75,7 +115,17 @@ class DelimiterSelector(ctk.CTkFrame):
             self.custom_entry.insert(0, delim)
 
     def configure_state(self, state: str) -> None:
-        """コンポーネント全体の活性 (normal) / 非活性 (disabled) を切り替える。"""
+        """コンポーネント全体の活性 (normal) / 非活性 (disabled) を切り替える。
+
+        Parameters
+        ----------
+        state : str
+            状態文字列 ('normal' または 'disabled')。
+
+        Returns
+        -------
+        None
+        """
         self.opt_menu.configure(state=state)
         if state == "disabled":
             self.custom_entry.configure(state="disabled")

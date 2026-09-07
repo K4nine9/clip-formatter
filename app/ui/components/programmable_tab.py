@@ -59,12 +59,29 @@ class ProgrammableTabFrame(ctk.CTkFrame):
     }
 
     def __init__(self, master, config: AppConfig, **kwargs):
+        """ProgrammableTabFrame を初期化する。
+
+        Parameters
+        ----------
+        master : Any
+            親ウィジェット。
+        config : AppConfig
+            設定データモデル。
+        **kwargs : Any
+            CTkFrame に渡す追加引数。
+        """
         super().__init__(master, fg_color="transparent", **kwargs)
         self.config = config
         self._build_ui()
         self.load_from_config(config)
 
     def _build_ui(self) -> None:
+        """プログラマブルタブのUIコンポーネント（パターン/区切り/スクリプトの各コンテナ）を構築する。
+
+        Returns
+        -------
+        None
+        """
         # モード選択セグメントボタン
         self.mode_var = ctk.StringVar(value=self.MODE_PATTERN)
         self.mode_selector = ctk.CTkSegmentedButton(
@@ -243,15 +260,45 @@ class ProgrammableTabFrame(ctk.CTkFrame):
         self._update_script_input_box_visibility()
 
     def _on_mode_switched(self, selected_mode: str) -> None:
-        """モード切り替え時のUI表示更新。"""
+        """モード切り替えセグメントボタン変更時のハンドラ。
+
+        Parameters
+        ----------
+        selected_mode : str
+            選択されたモード表示名。
+
+        Returns
+        -------
+        None
+        """
         self._update_container_visibility()
 
     def _on_script_in_mode_switched(self, selected_in_mode: str) -> None:
-        """スクリプト入力形式切り替え時のUI表示更新。"""
+        """スクリプト入力形式切り替え時のハンドラ。
+
+        Parameters
+        ----------
+        selected_in_mode : str
+            選択された入力形式表示名。
+
+        Returns
+        -------
+        None
+        """
         self._update_script_input_box_visibility()
 
     def _on_sample_selected(self, choice: str) -> None:
-        """サンプルコードが選択された時の自動入力。"""
+        """サンプルコードが選択された時の自動入力ハンドラ。
+
+        Parameters
+        ----------
+        choice : str
+            選択されたサンプルメニュー名。
+
+        Returns
+        -------
+        None
+        """
         if choice in self.SAMPLE_SCRIPTS:
             code = self.SAMPLE_SCRIPTS[choice]
             self.script_textbox.delete("1.0", "end")
@@ -260,7 +307,12 @@ class ProgrammableTabFrame(ctk.CTkFrame):
             self.sample_menu.set("サンプルコード挿入...")
 
     def _update_container_visibility(self) -> None:
-        """現在の選択モードに応じてコンテナを表示/非表示にする。"""
+        """現在の選択モードに応じてコンテナを表示/非表示にする。
+
+        Returns
+        -------
+        None
+        """
         mode = self.mode_var.get()
         self.pattern_container.pack_forget()
         self.delim_container.pack_forget()
@@ -274,7 +326,12 @@ class ProgrammableTabFrame(ctk.CTkFrame):
             self.script_container.pack(fill="both", expand=True)
 
     def _update_script_input_box_visibility(self) -> None:
-        """スクリプトモード内の入力定義ボックスの表示/非表示を切り替える。"""
+        """スクリプトモード内の入力定義ボックスの表示/非表示を切り替える。
+
+        Returns
+        -------
+        None
+        """
         in_mode = self.script_in_mode_var.get()
         self.script_pattern_box.pack_forget()
         self.script_delim_box.pack_forget()
@@ -288,7 +345,17 @@ class ProgrammableTabFrame(ctk.CTkFrame):
             self.script_full_box.pack(fill="x", after=self.script_in_mode_selector.master)
 
     def load_from_config(self, config: AppConfig) -> None:
-        """設定値からUI状態を初期化する。"""
+        """設定オブジェクトからUI状態を初期化・同期する。
+
+        Parameters
+        ----------
+        config : AppConfig
+            設定データモデル。
+
+        Returns
+        -------
+        None
+        """
         # モード選択
         p_mode = getattr(config, "prog_mode", "pattern")
         if p_mode == "script":
@@ -340,7 +407,17 @@ class ProgrammableTabFrame(ctk.CTkFrame):
         self._update_script_input_box_visibility()
 
     def save_to_config(self, config: AppConfig) -> None:
-        """現在のUI状態を設定モデルへ保存する。"""
+        """現在のUI状態を設定モデルへ保存する。
+
+        Parameters
+        ----------
+        config : AppConfig
+            保存先の設定データモデル。
+
+        Returns
+        -------
+        None
+        """
         mode = self.mode_var.get()
         if mode == self.MODE_SCRIPT:
             config.prog_mode = "script"
@@ -371,7 +448,13 @@ class ProgrammableTabFrame(ctk.CTkFrame):
         config.prog_script_code = self.script_textbox.get("1.0", "end-1c").strip()
 
     def get_transformer(self) -> Optional[BaseTransformer]:
-        """現在のUI入力および選択モードから適切な Transformer を構築して返す。"""
+        """現在のUI入力および選択モードから適切な Transformer を構築して返す。
+
+        Returns
+        -------
+        Optional[BaseTransformer]
+            構築された Transformer インスタンス（無効な入力の場合は None）。
+        """
         mode = self.mode_var.get()
 
         if mode == self.MODE_PATTERN:

@@ -9,17 +9,22 @@ from app.transformers.base import BaseTransformer, TransformResult
 class NumberFormatTransformer(BaseTransformer):
     r"""整数部（小数点以上）と小数部（小数点以下）を個別に設定してフォーマットする数値変換器。
 
-    SPEC:
-        - 整数部モード (int_mode):
-            - 'none': 整数部を変更しない。
-            - 'pad': 指定桁数 (int_digits) まで左側を '0' でパディング。
-        - 小数部モード (dec_mode):
-            - 'none': 小数部を変更しない。
-            - 'round': 小数丸め（可変長。元が整数なら小数点は付けず、指定桁数未満なら '0' を補完しない）。
-            - 'pad': ゼロ埋め（固定長。元が整数でも小数点とゼロを付与し、不足桁は '0' で補完）。
-        - 小数超過時処理 (dec_overflow):
-            - 'round': 四捨五入
-            - 'truncate': 切り捨て
+    Parameters
+    ----------
+    int_mode : str, optional
+        整数部の処理モード。'none'（変更しない）または 'pad'（ゼロ埋め）。デフォルトは 'none'。
+    int_digits : int, optional
+        整数部ゼロ埋め時の最小桁数。デフォルトは 3。
+    dec_mode : str, optional
+        小数部の処理モード。'none'（変更しない）、'round'（小数丸め・可変長）、'pad'（ゼロ埋め・固定長）。デフォルトは 'none'。
+    dec_digits : int, optional
+        小数部の桁数。デフォルトは 2。
+    dec_overflow : str, optional
+        小数部が指定桁数を超過した際の処理。'round'（四捨五入）または 'truncate'（切り捨て）。デフォルトは 'round'。
+
+    Notes
+    -----
+    - パーセント記号（`%`）付き数値や負符号（`-`）付き数値にも対応しています。
     """
 
     PATTERN = re.compile(r"([-+]?)(\d+)(?:\.(\d+))?(%)?")
@@ -40,6 +45,21 @@ class NumberFormatTransformer(BaseTransformer):
         dec_digits: int = 2,
         dec_overflow: str = "round",
     ):
+        """NumberFormatTransformer を初期化する。
+
+        Parameters
+        ----------
+        int_mode : str, optional
+            整数部モード ('none' または 'pad')。デフォルトは 'none'。
+        int_digits : int, optional
+            整数部桁数。デフォルトは 3。
+        dec_mode : str, optional
+            小数部モード ('none', 'round', 'pad')。デフォルトは 'none'。
+        dec_digits : int, optional
+            小数部桁数。デフォルトは 2。
+        dec_overflow : str, optional
+            超過時処理 ('round' または 'truncate')。デフォルトは 'round'。
+        """
         self.int_mode = int_mode
         self.int_digits = max(0, int_digits)
 
@@ -63,12 +83,30 @@ class NumberFormatTransformer(BaseTransformer):
             raise ValueError(f"無効な dec_mode です: {dec_mode}")
 
     def is_active(self) -> bool:
-        """何らかの変換が有効になっているかどうかを判定する。"""
+        """何らかのフォーマット変換が有効になっているかどうかを判定する。
+
+        Returns
+        -------
+        bool
+            整数部または小数部が有効な変換設定になっている場合は True。
+        """
         int_active = (self.int_mode == self.MODE_PAD and self.int_digits > 0)
         dec_active = (self.dec_mode != self.MODE_NONE)
         return int_active or dec_active
 
     def transform(self, text: str) -> TransformResult:
+        """テキスト内の数値を検知し、整数部・小数部の設定に従って変換する。
+
+        Parameters
+        ----------
+        text : str
+            変換対象のテキスト。
+
+        Returns
+        -------
+        TransformResult
+            数値がフォーマットされた結果オブジェクト。
+        """
         if not text:
             return TransformResult.unchanged(text, "入力テキストが空です")
 
@@ -78,6 +116,18 @@ class NumberFormatTransformer(BaseTransformer):
         applied = False
 
         def _repl(match: re.Match) -> str:
+            """正規表現に一致した各数値に対して、整数部・小数部の設定に応じたフォーマットを適用する。
+
+            Parameters
+            ----------
+            match : re.Match
+                数値・符号・パーセント記号を含む正規表現マッチオブジェクト。
+
+            Returns
+            -------
+            str
+                フォーマット適用後の数値文字列。
+            """
             nonlocal applied
             sign = match.group(1) or ""
             raw_int = match.group(2)
@@ -100,46 +150,44 @@ class NumberFormatTransformer(BaseTransformer):
                         if len(raw_dec) <= self.dec_digits:
                             final_dec = f".{raw_dec}"
                         else:
-                            # 超過処理
                             if self.dec_overflow == self.OVERFLOW_TRUNCATE:
+                                truncated = raw_dec[:self.dec_digits]
+                                final_dec = f".{truncated}" if self.dec_digits > 0 else ""
+                            else:
+                                # 四捨五入
+                                full_float_str = f"{raw_int}.{raw_dec}"
+                                rounded = round(float(full_float_str), self.dec_digits)
                                 if self.dec_digits == 0:
+                                    base_int = str(int(rounded))
                                     final_dec = ""
                                 else:
-                                    final_dec = f".{raw_dec[:self.dec_digits]}"
-                            else:  # 四捨五入
-                                num = float(f"{raw_int}.{raw_dec}")
-                                if self.dec_digits == 0:
-                                    base_int = f"{round(num):.0f}"
-                                    final_dec = ""
-                                else:
-                                    formatted = f"{num:.{self.dec_digits}f}"
-                                    base_int, dec_part = formatted.split(".")
-                                    final_dec = f".{dec_part}"
+                                    r_parts = f"{rounded:.{self.dec_digits}f}".split(".")
+                                    base_int = r_parts[0]
+                                    final_dec = f".{r_parts[1]}"
 
                 elif self.dec_mode == self.MODE_PAD:
-                    # 固定長（常に指定桁数に固定。元が整数でも .00 を付与。不足は 0 補完）
-                    if self.dec_digits == 0:
-                        if raw_dec is not None and self.dec_overflow == self.OVERFLOW_ROUND:
-                            num = float(f"{raw_int}.{raw_dec}")
-                            base_int = f"{round(num):.0f}"
-                        final_dec = ""
+                    # 固定長（元が整数でも小数点とゼロを付与し、不足桁は0で補完）
+                    if raw_dec is None:
+                        final_dec = f".{'0' * self.dec_digits}" if self.dec_digits > 0 else ""
                     else:
-                        if raw_dec is None:
-                            final_dec = f".{'0' * self.dec_digits}"
-                        elif len(raw_dec) < self.dec_digits:
-                            # 不足分を0埋め
+                        if len(raw_dec) < self.dec_digits:
                             final_dec = f".{raw_dec.ljust(self.dec_digits, '0')}"
                         elif len(raw_dec) == self.dec_digits:
                             final_dec = f".{raw_dec}"
                         else:
-                            # 超過処理
                             if self.dec_overflow == self.OVERFLOW_TRUNCATE:
-                                final_dec = f".{raw_dec[:self.dec_digits]}"
-                            else:  # 四捨五入
-                                num = float(f"{raw_int}.{raw_dec}")
-                                formatted = f"{num:.{self.dec_digits}f}"
-                                base_int, dec_part = formatted.split(".")
-                                final_dec = f".{dec_part}"
+                                final_dec = f".{raw_dec[:self.dec_digits]}" if self.dec_digits > 0 else ""
+                            else:
+                                # 四捨五入
+                                full_float_str = f"{raw_int}.{raw_dec}"
+                                rounded = round(float(full_float_str), self.dec_digits)
+                                if self.dec_digits == 0:
+                                    base_int = str(int(rounded))
+                                    final_dec = ""
+                                else:
+                                    r_parts = f"{rounded:.{self.dec_digits}f}".split(".")
+                                    base_int = r_parts[0]
+                                    final_dec = f".{r_parts[1]}"
 
                 # --- 2. 整数部の処理 ---
                 if self.int_mode == self.MODE_PAD and self.int_digits > 0:
@@ -147,25 +195,24 @@ class NumberFormatTransformer(BaseTransformer):
                 else:
                     final_int = base_int
 
-                res = f"{sign}{final_int}{final_dec}{pct}"
-                if res != match.group(0):
+                formatted = f"{sign}{final_int}{final_dec}{pct}"
+                if formatted != match.group(0):
                     applied = True
-                return res
+                return formatted
             except Exception:
                 return match.group(0)
 
         new_text = self.PATTERN.sub(_repl, text)
 
-        # 適用ルールの概要文
         descs = []
         if self.int_mode == self.MODE_PAD and self.int_digits > 0:
-            descs.append(f"整数{self.int_digits}桁パディング")
-
-        overflow_text = "四捨五入" if self.dec_overflow == self.OVERFLOW_ROUND else "切り捨て"
+            descs.append(f"整数{self.int_digits}桁ゼロ埋め")
         if self.dec_mode == self.MODE_ROUND:
-            descs.append(f"小数{self.dec_digits}桁丸め({overflow_text})")
+            over_text = "切り捨て" if self.dec_overflow == self.OVERFLOW_TRUNCATE else "四捨五入"
+            descs.append(f"小数{self.dec_digits}桁丸め({over_text})")
         elif self.dec_mode == self.MODE_PAD:
-            descs.append(f"小数{self.dec_digits}桁ゼロ埋め({overflow_text})")
+            over_text = "切り捨て" if self.dec_overflow == self.OVERFLOW_TRUNCATE else "四捨五入"
+            descs.append(f"小数{self.dec_digits}桁ゼロ埋め({over_text})")
 
         desc_str = ", ".join(descs) if descs else "数値フォーマット"
         if applied and new_text != text:
@@ -174,9 +221,22 @@ class NumberFormatTransformer(BaseTransformer):
 
 
 class RoundTransformer(BaseTransformer):
-    """(後方互換用) 数値・パーセントの小数点丸め変換器。"""
+    """(後方互換用) 数値・パーセントの小数点丸め変換器。
+
+    Parameters
+    ----------
+    digits : int, optional
+        丸め対象の小数桁数。デフォルトは 2。
+    """
 
     def __init__(self, digits: int = 2):
+        """RoundTransformer を初期化する。
+
+        Parameters
+        ----------
+        digits : int, optional
+            小数桁数。デフォルトは 2。
+        """
         self._inner = NumberFormatTransformer(
             int_mode="none",
             dec_mode="round",
@@ -185,6 +245,18 @@ class RoundTransformer(BaseTransformer):
         self.digits = digits
 
     def transform(self, text: str) -> TransformResult:
+        """テキスト内の数値を指定桁数で丸める。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト。
+
+        Returns
+        -------
+        TransformResult
+            変換結果オブジェクト。
+        """
         res = self._inner.transform(text)
         if res.success:
             return TransformResult.successful(res.text, f"小数{self.digits}桁丸め")
@@ -192,9 +264,26 @@ class RoundTransformer(BaseTransformer):
 
 
 class ZeroPadTransformer(BaseTransformer):
-    """(後方互換用) 数値ゼロ埋め変換器。"""
+    """(後方互換用) 数値ゼロ埋め変換器。
+
+    Parameters
+    ----------
+    int_digits : int, optional
+        整数部のゼロ埋め桁数。デフォルトは 0。
+    dec_digits : int, optional
+        小数部のゼロ埋め桁数。デフォルトは 0。
+    """
 
     def __init__(self, int_digits: int = 0, dec_digits: int = 0):
+        """ZeroPadTransformer を初期化する。
+
+        Parameters
+        ----------
+        int_digits : int, optional
+            整数部桁数。デフォルトは 0。
+        dec_digits : int, optional
+            小数部桁数。デフォルトは 0。
+        """
         if int_digits == 0 and dec_digits == 0:
             raise ValueError("整数部または小数部の少なくとも一方に 1 以上の桁数を指定してください。")
         self.int_digits = int_digits
@@ -207,6 +296,18 @@ class ZeroPadTransformer(BaseTransformer):
         )
 
     def transform(self, text: str) -> TransformResult:
+        """テキスト内の数値をゼロ埋めする。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト。
+
+        Returns
+        -------
+        TransformResult
+            変換結果オブジェクト。
+        """
         res = self._inner.transform(text)
         if res.success:
             parts = []
@@ -219,7 +320,17 @@ class ZeroPadTransformer(BaseTransformer):
 
 
 class ColumnExtractTransformer(BaseTransformer):
-    """区切り文字で区切られたデータから特定列を抽出する変換器。"""
+    """区切り文字で区切られたデータから特定列を抽出する変換器。
+
+    Parameters
+    ----------
+    indices : Sequence[int]
+        抽出対象の列インデックス（1-based、負数は末尾から）。
+    delimiter : str, optional
+        入力データの列区切り文字。デフォルトは ','。
+    output_delimiter : str, optional
+        出力時の列区切り文字。デフォルトは ', '。
+    """
 
     def __init__(
         self,
@@ -227,6 +338,17 @@ class ColumnExtractTransformer(BaseTransformer):
         delimiter: str = ",",
         output_delimiter: str = ", ",
     ):
+        """ColumnExtractTransformer を初期化する。
+
+        Parameters
+        ----------
+        indices : Sequence[int]
+            1-basedの列インデックス列。
+        delimiter : str, optional
+            入力区切り文字。デフォルトは ','。
+        output_delimiter : str, optional
+            出力区切り文字。デフォルトは ', '。
+        """
         if not indices:
             raise ValueError("抽出インデックスが指定されていません。")
         self.indices = list(indices)
@@ -235,6 +357,23 @@ class ColumnExtractTransformer(BaseTransformer):
 
     @staticmethod
     def parse_indices_string(indices_str: str) -> List[int]:
+        """カンマ区切りのインデックス文字列をパースして整数のリストを返す。
+
+        Parameters
+        ----------
+        indices_str : str
+            1-based表記のカンマ区切り文字列（例: '1, -1'）。
+
+        Returns
+        -------
+        list[int]
+            整数のリスト。
+
+        Raises
+        ------
+        ValueError
+            0 が含まれる場合やパースできない場合。
+        """
         results: List[int] = []
         for part in indices_str.split(","):
             part = part.strip()
@@ -249,9 +388,33 @@ class ColumnExtractTransformer(BaseTransformer):
         return results
 
     def _to_zero_based(self, index: int) -> int:
+        """1-based のインデックスを 0-based のインデックスに変換する。
+
+        Parameters
+        ----------
+        index : int
+            1-based インデックス。
+
+        Returns
+        -------
+        int
+            0-based インデックス。
+        """
         return index - 1 if index > 0 else index
 
     def transform(self, text: str) -> TransformResult:
+        """入力テキストを行ごとに分割し、指定列を抽出して結合する。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト。
+
+        Returns
+        -------
+        TransformResult
+            列抽出結果オブジェクト。
+        """
         if not text:
             return TransformResult.unchanged(text, "入力テキストが空です")
 
@@ -285,7 +448,41 @@ class ColumnExtractTransformer(BaseTransformer):
 
 
 class PresetTransformer(BaseTransformer):
-    """定型ルール（数値フォーマット、列抽出）を複合適用するトランスフォーマー。"""
+    """定型ルール（数値フォーマット、列抽出、改行除去）を複合適用するトランスフォーマー。
+
+    Parameters
+    ----------
+    int_mode : str, optional
+        整数部モード ('none' または 'pad')。デフォルトは 'none'。
+    int_digits : int, optional
+        整数部桁数。デフォルトは 3。
+    dec_mode : str, optional
+        小数部モード ('none', 'round', 'pad')。デフォルトは 'none'。
+    dec_digits : int, optional
+        小数部桁数。デフォルトは 2。
+    dec_overflow : str, optional
+        小数超過時処理 ('round' または 'truncate')。デフォルトは 'round'。
+    col_enabled : bool, optional
+        列抽出を有効にするかどうか。デフォルトは False。
+    col_delimiter : str, optional
+        列区切り文字。デフォルトは ','。
+    col_indices : Optional[Union[List[int], str]], optional
+        抽出列インデックス。デフォルトは None (1, -1)。
+    col_output_delimiter : str, optional
+        抽出後の列区切り文字。デフォルトは ', '。
+    unwrap_enabled : bool, optional
+        PDF改行・ハイフン除去を有効にするかどうか。デフォルトは False。
+    round_enabled : Optional[bool], optional
+        後方互換用フラグ。
+    round_digits : Optional[int], optional
+        後方互換用桁数。
+    pad_enabled : Optional[bool], optional
+        後方互換用フラグ。
+    pad_int_digits : Optional[int], optional
+        後方互換用整数桁数。
+    pad_dec_digits : Optional[int], optional
+        後方互換用小数桁数。
+    """
 
     def __init__(
         self,
@@ -309,6 +506,7 @@ class PresetTransformer(BaseTransformer):
         pad_int_digits: Optional[int] = None,
         pad_dec_digits: Optional[int] = None,
     ):
+        """PresetTransformer を初期化する。"""
         # 後方互換マッピング
         if pad_enabled is not None and pad_enabled:
             int_mode = "pad" if (pad_int_digits or 0) > 0 else "none"
@@ -344,6 +542,18 @@ class PresetTransformer(BaseTransformer):
             self.col_indices = [1, -1]
 
     def transform(self, text: str) -> TransformResult:
+        """有効化されている定型ルール（改行除去・列抽出・数値整形）を順次適用する。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト。
+
+        Returns
+        -------
+        TransformResult
+            複合適用後の結果オブジェクト。
+        """
         if (
             not self.number_transformer.is_active()
             and not self.col_enabled

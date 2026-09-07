@@ -8,7 +8,18 @@ from app.transformers.base import BaseTransformer, TransformResult
 
 
 def _is_cjk(char: str) -> bool:
-    """文字が和文（漢字、ひらがな、カタカナ、全角記号等）かどうかを判定する。"""
+    """指定された1文字が和文（漢字、ひらがな、カタカナ、全角記号等）かどうかを判定する。
+
+    Parameters
+    ----------
+    char : str
+        判定対象の1文字。
+
+    Returns
+    -------
+    bool
+        和文または全角記号である場合は True、英数字や半角記号の場合は False。
+    """
     if not char:
         return False
     name = unicodedata.name(char, "")
@@ -25,11 +36,29 @@ def _is_cjk(char: str) -> bool:
 
 
 class TextUnwrapTransformer(BaseTransformer):
-    """PDFなどからコピーしたテキストの行末改行・ハイフネーションを自然な1段落に整形する。"""
+    """PDFなどからコピーしたテキストの行末改行・ハイフネーションを自然な1段落に整形する変換器。"""
 
+    # 行末ハイフネーションの検出パターン (例: "differ-\n ent" -> "different")
     HYPHEN_BREAK_PATTERN = re.compile(r"([A-Za-z0-9]+)-\s*\r?\n\s*([A-Za-z0-9]+)")
 
     def transform(self, text: str) -> TransformResult:
+        """入力テキストの改行およびハイフネーションを解除・結合する。
+
+        Parameters
+        ----------
+        text : str
+            変換対象のテキスト（PDF等からコピーされた複数行テキスト）。
+
+        Returns
+        -------
+        TransformResult
+            改行やハイフンが結合された結果オブジェクト。
+
+        Notes
+        -----
+        - 連続する空行による段落の区切りは保持されます。
+        - 英文同士の改行は半角スペースで結合されますが、和文同士の改行は余分なスペースを入れずに直接結合されます。
+        """
         if not text or not text.strip():
             return TransformResult.unchanged(text, "入力テキストが空です")
 
@@ -42,7 +71,7 @@ class TextUnwrapTransformer(BaseTransformer):
 
         unwrapped_paras: List[str] = []
         for p in paragraphs:
-            lines = [l.strip() for l in p.split("\n") if l.strip()]
+            lines = [line.strip() for line in p.split("\n") if line.strip()]
             if not lines:
                 continue
 

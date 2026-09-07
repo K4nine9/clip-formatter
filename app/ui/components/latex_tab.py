@@ -38,12 +38,29 @@ class LatexTabFrame(ctk.CTkFrame):
     ENV_VALUE_MAP = {v: k for k, v in ENV_LABEL_MAP.items()}
 
     def __init__(self, master, config: AppConfig, **kwargs):
+        """LatexTabFrame を初期化する。
+
+        Parameters
+        ----------
+        master : Any
+            親ウィジェット。
+        config : AppConfig
+            設定データオブジェクト。
+        **kwargs : Any
+            CTkFrame に渡す追加引数。
+        """
         super().__init__(master, fg_color="transparent", **kwargs)
         self.config = config
         self._build_ui()
         self.load_from_config(config)
 
     def _build_ui(self) -> None:
+        """LaTeXタブのUIコンポーネント（表組み・数式切り替え、各設定枠）を構築する。
+
+        Returns
+        -------
+        None
+        """
         # 1. サブモード切り替えラジオボタン
         mode_header = ctk.CTkFrame(self, fg_color="transparent")
         mode_header.pack(fill="x", padx=12, pady=(10, 4))
@@ -214,6 +231,12 @@ class LatexTabFrame(ctk.CTkFrame):
         self._on_mode_changed()
 
     def _on_mode_changed(self) -> None:
+        """表組みモードと数式モードの切り替え時の表示更新ハンドラ。
+
+        Returns
+        -------
+        None
+        """
         mode = self.latex_mode_var.get()
         if mode == self.MODE_TABLE:
             self.formula_frame.pack_forget()
@@ -223,10 +246,27 @@ class LatexTabFrame(ctk.CTkFrame):
             self.formula_frame.pack(fill="x", padx=16, pady=2)
 
     def _on_table_round_toggled(self) -> None:
+        """表組み数値丸めチェックボックスがトグルされたときのハンドラ。
+
+        Returns
+        -------
+        None
+        """
         state = "normal" if self.table_round_var.get() else "disabled"
         self.table_digits_entry.configure(state=state)
 
     def _on_formula_dir_changed(self, val: str) -> None:
+        """数式変換方向セグメントボタンが変更されたときのハンドラ。
+
+        Parameters
+        ----------
+        val : str
+            選択された方向文字列（'手打ち数式 → LaTeX数式' など）。
+
+        Returns
+        -------
+        None
+        """
         if val == "手打ち数式 → LaTeX数式":
             self.formula_dir_var.set(LatexFormulaTransformer.DIR_PLAIN_TO_LATEX)
             self.formula_env_menu.configure(state="normal")
@@ -235,6 +275,17 @@ class LatexTabFrame(ctk.CTkFrame):
             self.formula_env_menu.configure(state="disabled")
 
     def load_from_config(self, config: AppConfig) -> None:
+        """設定オブジェクトからUI状態を初期化・同期する。
+
+        Parameters
+        ----------
+        config : AppConfig
+            設定データモデル。
+
+        Returns
+        -------
+        None
+        """
         mode = getattr(config, "latex_mode", self.MODE_TABLE)
         self.latex_mode_var.set(mode)
 
@@ -278,6 +329,17 @@ class LatexTabFrame(ctk.CTkFrame):
         self._on_mode_changed()
 
     def save_to_config(self, config: AppConfig) -> None:
+        """現在のUI状態を設定モデルへ保存する。
+
+        Parameters
+        ----------
+        config : AppConfig
+            保存先の設定データモデル。
+
+        Returns
+        -------
+        None
+        """
         config.latex_mode = self.latex_mode_var.get()
         config.latex_table_delim = self.table_delim_selector.get_delimiter()
         config.latex_table_style = self.STYLE_LABEL_MAP.get(
@@ -311,6 +373,13 @@ class LatexTabFrame(ctk.CTkFrame):
         )
 
     def get_transformer(self) -> Optional[BaseTransformer]:
+        """現在のUI入力から適切な LaTeX トランスフォーマーを構築して返す。
+
+        Returns
+        -------
+        Optional[BaseTransformer]
+            構築された LatexTableTransformer または LatexFormulaTransformer。
+        """
         mode = self.latex_mode_var.get()
         if mode == self.MODE_TABLE:
             delim = self.table_delim_selector.get_delimiter()

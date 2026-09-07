@@ -75,11 +75,23 @@ SAFE_MODULES: Dict[str, Any] = {
 def sanitize_result(val: Any) -> str:
     """出力変数 result の型をチェックし、安全に文字列化する。
 
-    - str: そのまま
-    - int, float, bool: str() で変換
-    - list, tuple, set: 各要素を文字列化して改行結合
-    - dict: JSON形式（インデント付き）または str() で変換
-    - その他オブジェクト: str() で安全に変換
+    Parameters
+    ----------
+    val : Any
+        スクリプト実行によって代入された値。
+
+    Returns
+    -------
+    str
+        文字列化された安全な出力テキスト。
+
+    Notes
+    -----
+    - str: そのまま返却。
+    - int, float, bool: str() で変換。
+    - list, tuple, set: 各要素を文字列化して改行（\\n）で結合。
+    - dict: JSON形式（インデント2）でシリアライズ。
+    - その他: str() による安全な文字列変換。
     """
     if val is None:
         return ""
@@ -100,25 +112,46 @@ def sanitize_result(val: Any) -> str:
 def execute_user_script(script: str, scope: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
     """ユーザーが入力したPythonスクリプトを実行し、result変数の値を検証・抽出する。
 
-    Args:
-        script: 実行するPythonコード。
-        scope: スクリプトに渡す変数辞書。
+    Parameters
+    ----------
+    script : str
+        実行するユーザー定義Pythonスクリプト。
+    scope : dict[str, Any]
+        スクリプトに渡す変数辞書。
 
-    Returns:
-        (success, result_str, error_message)
+    Returns
+    -------
+    tuple(bool, Optional[str], Optional[str])
+        (success, result_str, error_message) の3要素タプル。
+        - success: 実行およびバリデーションが成功したかどうか。
+        - result_str: 文字列化された結果（失敗時は None）。
+        - error_message: 失敗時のエラー内容（成功時は None）。
+
+    Notes
+    -----
+    - ファイルI/Oや外部プロセス実行は制限されたサンドボックスで実行されます。
+    - 変数名が不正な識別子（記号やハイフンなどを含む）の場合でも、構文破壊を防ぐため
+      有効な識別子のみ直接展開し、辞書 `vars[...]` からのアクセスを常に保証します。
     """
     if not script or not script.strip():
         return False, None, "スクリプトが入力されていません"
+
+    # 有効な識別子のみ直接スコープに展開し、予約語や記号付き変数の衝突を回避
+    safe_direct_vars: Dict[str, Any] = {}
+    for k, v in scope.items():
+        if k.isidentifier():
+            safe_direct_vars[k] = v
 
     # 実行スコープの作成
     exec_scope: Dict[str, Any] = {
         "__builtins__": SAFE_BUILTINS,
         **SAFE_MODULES,
-        **scope,
+        **safe_direct_vars,
+        "vars": scope.get("vars", scope),
     }
 
     try:
-        # スクリプトをコンパイル（構文エラーやインデントエラーの検出）
+        # スクリプトをコンパイル（構文エラーやインデントエラーの事前検出）
         compiled = compile(script, "<clip_formatter_script>", "exec")
         exec(compiled, exec_scope)
     except SyntaxError as e:
@@ -138,7 +171,21 @@ def execute_user_script(script: str, scope: Dict[str, Any]) -> Tuple[bool, Optio
 
 
 class PythonScriptTransformer(BaseTransformer):
-    """入力定義（パターンマッチ / 区切り文字 / テキスト全文）とPythonスクリプトを連携させた変換器。"""
+    """入力定義（パターンマッチ / 区切り文字 / テキスト全文）とPythonスクリプトを連携させた変換器。
+
+    Parameters
+    ----------
+    input_mode : str, optional
+        入力形式 ('pattern', 'delimiter', 'full_text')。デフォルトは 'pattern'。
+    script_code : str, optional
+        実行するPythonスクリプト。デフォルトは ''。
+    pattern_input : str, optional
+        パターンマッチ時の入力パターン（例: 'リンゴが{a}個'）。デフォルトは ''。
+    delimiter : str, optional
+        区切り文字モード時の区切り文字。デフォルトは ','。
+    var_names : Union[Sequence[str], str], optional
+        区切り文字モード時の変数名定義列。デフォルトは ''。
+    """
 
     MODE_PATTERN = "pattern"
     MODE_DELIMITER = "delimiter"
@@ -154,6 +201,7 @@ class PythonScriptTransformer(BaseTransformer):
         delimiter: str = ",",
         var_names: Union[Sequence[str], str] = "",
     ):
+        """PythonScriptTransformer を初期化する。"""
         self.input_mode = input_mode
         self.script_code = script_code
 
@@ -192,6 +240,18 @@ class PythonScriptTransformer(BaseTransformer):
             self.var_names = [v.strip() for v in var_names if v.strip()]
 
     def transform(self, text: str) -> TransformResult:
+        """入力テキストに対して選択された入力モードでスクリプトを実行し、変換する。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト。
+
+        Returns
+        -------
+        TransformResult
+            スクリプト実行結果オブジェクト。
+        """
         if not text:
             return TransformResult.unchanged(text, "入力テキストが空です")
 
@@ -206,6 +266,18 @@ class PythonScriptTransformer(BaseTransformer):
             return self._transform_full_text(text)
 
     def _transform_pattern(self, text: str) -> TransformResult:
+        """パターンマッチ形式でテキスト内の一致箇所をスクリプトで置換する。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト。
+
+        Returns
+        -------
+        TransformResult
+            置換結果オブジェクト。
+        """
         if not self.pattern_input:
             return TransformResult.skipped("入力パターンが指定されていません", original_text=text)
 
@@ -219,6 +291,18 @@ class PythonScriptTransformer(BaseTransformer):
         first_error: Optional[str] = None
 
         def _replace_match(m: re.Match) -> str:
+            """正規表現のマッチオブジェクトからスコープ変数を展開し、ユーザースクリプトを実行して置換結果を生成する。
+
+            Parameters
+            ----------
+            m : re.Match
+                パターン一致箇所を表すマッチオブジェクト。
+
+            Returns
+            -------
+            str
+                スクリプト実行結果文字列（エラー発生時は元のマッチ文字列）。
+            """
             nonlocal first_error
             if first_error is not None:
                 return m.group(0)
@@ -254,6 +338,18 @@ class PythonScriptTransformer(BaseTransformer):
         return TransformResult.unchanged(text, "置換前後のテキストに変化はありませんでした")
 
     def _transform_delimiter(self, text: str) -> TransformResult:
+        """区切り文字形式で行ごとに変数を抽出し、スクリプトを実行して結合する。
+
+        Parameters
+        ----------
+        text : str
+            複数行の区切りテキスト。
+
+        Returns
+        -------
+        TransformResult
+            各行のスクリプト実行結果を行結合したオブジェクト。
+        """
         if not self.var_names:
             return TransformResult.skipped("入力変数が定義されていません", original_text=text)
 
@@ -295,11 +391,24 @@ class PythonScriptTransformer(BaseTransformer):
         return TransformResult.successful(transformed_text, "スクリプトによる区切り行変換完了")
 
     def _transform_full_text(self, text: str) -> TransformResult:
+        """入力テキスト全体を変数 text, lines としてスクリプトを実行する。
+
+        Parameters
+        ----------
+        text : str
+            入力テキスト全体。
+
+        Returns
+        -------
+        TransformResult
+            スクリプト実行結果オブジェクト。
+        """
         lines = text.splitlines(keepends=False)
         scope: Dict[str, Any] = {
             "text": text,
             "lines": lines,
             "line_count": len(lines),
+            "vars": {"text": text, "lines": lines},
         }
 
         success, out_str, err = execute_user_script(self.script_code, scope)

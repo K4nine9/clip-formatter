@@ -10,11 +10,30 @@ class TestClipboardMonitor(unittest.TestCase):
     """ClipboardMonitor の検知および Undo 機能のテスト"""
 
     def setUp(self):
+        """テスト用の ClipboardMonitor インスタンスを初期化する。
+
+        Returns
+        -------
+        None
+        """
         self.monitor = ClipboardMonitor()
 
     @patch("pyperclip.paste")
     @patch("pyperclip.copy")
     def test_detection_and_undo(self, mock_copy, mock_paste):
+        """クリップボード変更の検知、書き込み、および Undo 操作による元テキスト復元を検証する。
+
+        Parameters
+        ----------
+        mock_copy : MagicMock
+            pyperclip.copy のモックオブジェクト。
+        mock_paste : MagicMock
+            pyperclip.paste のモックオブジェクト。
+
+        Returns
+        -------
+        None
+        """
         # 1. ユーザーがテキストをコピーしたとシミュレート
         mock_paste.return_value = "元のテキスト Original Text"
         read_text = self.monitor.check_clipboard()
