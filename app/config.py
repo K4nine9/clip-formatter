@@ -27,6 +27,9 @@ class AppConfig:
     col_indices: str = "1, -1"
 
     # プログラマブル設定
+    prog_mode: str = "pattern"  # "pattern" または "delimiter"
+    prog_pattern_input: str = "私は{a}時間で{b}つのりんごを食べました"
+    prog_pattern_output: str = "私は{b}時間で{a}つのりんごを食べました"
     prog_delimiter: str = ","
     prog_input_vars: str = "a, b, c, d, e"
     prog_output_template: str = "{e}, {b}, {c}, {d}, {a}"

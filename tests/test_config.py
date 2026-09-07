@@ -30,6 +30,9 @@ class TestConfig(unittest.TestCase):
             active_tab="プログラマブルモード",
             round_digits=4,
             col_indices="2, 3",
+            prog_mode="pattern",
+            prog_pattern_input="私は{a}時間で{b}つのりんご",
+            prog_pattern_output="私は{b}時間で{a}つのりんご",
             prog_delimiter="\t",
         )
         self.assertTrue(save_config(cfg, self.config_path))
@@ -40,6 +43,9 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(loaded.active_tab, "プログラマブルモード")
         self.assertEqual(loaded.round_digits, 4)
         self.assertEqual(loaded.col_indices, "2, 3")
+        self.assertEqual(loaded.prog_mode, "pattern")
+        self.assertEqual(loaded.prog_pattern_input, "私は{a}時間で{b}つのりんご")
+        self.assertEqual(loaded.prog_pattern_output, "私は{b}時間で{a}つのりんご")
         self.assertEqual(loaded.prog_delimiter, "\t")
 
     def test_load_corrupted_file_falls_back_to_default(self):

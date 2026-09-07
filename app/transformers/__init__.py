@@ -1,6 +1,7 @@
 """テキスト変換器パッケージ。"""
 
 from app.transformers.base import BaseTransformer, TransformResult
+from app.transformers.pattern import PatternTransformer
 from app.transformers.preset import (
     ColumnExtractTransformer,
     PresetTransformer,
@@ -15,4 +16,5 @@ __all__ = [
     "ColumnExtractTransformer",
     "PresetTransformer",
     "TemplateTransformer",
+    "PatternTransformer",
 ]
