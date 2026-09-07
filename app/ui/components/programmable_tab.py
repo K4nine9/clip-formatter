@@ -7,6 +7,7 @@ from app.config import AppConfig
 from app.transformers.base import BaseTransformer
 from app.transformers.pattern import PatternTransformer
 from app.transformers.template import TemplateTransformer
+from app.ui.components.delimiter_selector import DelimiterSelector
 
 
 class ProgrammableTabFrame(ctk.CTkFrame):
@@ -83,8 +84,8 @@ class ProgrammableTabFrame(ctk.CTkFrame):
         sep_frame = ctk.CTkFrame(self.delim_container, fg_color="transparent")
         sep_frame.pack(fill="x", padx=12, pady=4)
         ctk.CTkLabel(sep_frame, text="区切り文字:").pack(side="left", padx=(0, 8))
-        self.delim_entry = ctk.CTkEntry(sep_frame, width=80)
-        self.delim_entry.pack(side="left")
+        self.delim_selector = DelimiterSelector(sep_frame, default_delimiter=",")
+        self.delim_selector.pack(side="left")
 
         ctk.CTkLabel(
             self.delim_container,
@@ -135,8 +136,7 @@ class ProgrammableTabFrame(ctk.CTkFrame):
         self.pattern_output_entry.insert(0, getattr(config, "prog_pattern_output", ""))
 
         # 区切り文字設定
-        self.delim_entry.delete(0, "end")
-        self.delim_entry.insert(0, config.prog_delimiter)
+        self.delim_selector.set_delimiter(config.prog_delimiter)
 
         self.delim_input_entry.delete(0, "end")
         self.delim_input_entry.insert(0, config.prog_input_vars)
@@ -152,8 +152,7 @@ class ProgrammableTabFrame(ctk.CTkFrame):
         config.prog_pattern_input = self.pattern_input_entry.get().strip()
         config.prog_pattern_output = self.pattern_output_entry.get().strip()
 
-        delim = self.delim_entry.get()
-        config.prog_delimiter = delim if delim else ","
+        config.prog_delimiter = self.delim_selector.get_delimiter()
         config.prog_input_vars = self.delim_input_entry.get().strip()
         config.prog_output_template = self.delim_output_entry.get().strip()
 
@@ -174,7 +173,7 @@ class ProgrammableTabFrame(ctk.CTkFrame):
             except Exception:
                 return None
         else:
-            delim = self.delim_entry.get() or ","
+            delim = self.delim_selector.get_delimiter()
             raw_vars = self.delim_input_entry.get().strip()
             template = self.delim_output_entry.get().strip()
 

@@ -8,6 +8,7 @@ from app.config import AppConfig, DEFAULT_CONFIG_PATH, load_config, save_config
 from app.core.hotkey import GlobalHotkeyListener
 from app.core.monitor import ClipboardMonitor
 from app.transformers.base import TransformResult
+from app.ui.components.latex_tab import LatexTabFrame
 from app.ui.components.preset_tab import PresetTabFrame
 from app.ui.components.programmable_tab import ProgrammableTabFrame
 from app.ui.toast import show_toast
@@ -23,6 +24,7 @@ class ClipboardTransformerApp(ctk.CTk):
 
     TAB_PRESET = "定型ルールモード"
     TAB_PROGRAMMABLE = "プログラマブルモード"
+    TAB_LATEX = "LaTeXモード"
 
     def __init__(self, config_path=DEFAULT_CONFIG_PATH):
         super().__init__()
@@ -31,8 +33,8 @@ class ClipboardTransformerApp(ctk.CTk):
         self.config: AppConfig = load_config(self.config_path)
 
         self.title("ClipFormatter")
-        self.geometry("560x640")
-        self.minsize(500, 580)
+        self.geometry("600x700")
+        self.minsize(540, 620)
 
         # 内部状態
         self.is_active = self.config.is_active
@@ -52,26 +54,77 @@ class ClipboardTransformerApp(ctk.CTk):
 
     def _build_ui(self) -> None:
         """GUIレイアウトを構築する。"""
-        # 1. ヘッダーフレーム（有効/無効トグル）
+        # 1. プリセット管理バー
+        preset_bar = ctk.CTkFrame(self)
+        preset_bar.pack(fill="x", padx=16, pady=(12, 4))
+
+        ctk.CTkLabel(
+            preset_bar,
+            text="プリセット:",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(side="left", padx=(12, 6), pady=8)
+
+        preset_names = self.config.get_preset_names()
+        cur_preset = self.config.current_preset
+        if cur_preset not in preset_names and preset_names:
+            cur_preset = preset_names[0]
+
+        self.preset_menu = ctk.CTkOptionMenu(
+            preset_bar,
+            values=preset_names,
+            width=160,
+            command=self._on_preset_selected,
+        )
+        self.preset_menu.set(cur_preset)
+        self.preset_menu.pack(side="left", padx=(0, 8), pady=8)
+
+        self.btn_save_preset = ctk.CTkButton(
+            preset_bar,
+            text="上書き保存",
+            width=65,
+            command=self._on_save_preset_clicked,
+        )
+        self.btn_save_preset.pack(side="left", padx=(0, 6), pady=8)
+
+        self.btn_new_preset = ctk.CTkButton(
+            preset_bar,
+            text="＋新規保存",
+            width=65,
+            command=self._on_new_preset_clicked,
+        )
+        self.btn_new_preset.pack(side="left", padx=(0, 6), pady=8)
+
+        self.btn_delete_preset = ctk.CTkButton(
+            preset_bar,
+            text="削除",
+            width=45,
+            fg_color="#C62828",
+            hover_color="#B71C1C",
+            command=self._on_delete_preset_clicked,
+        )
+        self.btn_delete_preset.pack(side="left", padx=(0, 10), pady=8)
+
+        # 2. ヘッダーフレーム（有効/無効トグル）
         self.header_frame = ctk.CTkFrame(self)
-        self.header_frame.pack(fill="x", padx=16, pady=(16, 8))
+        self.header_frame.pack(fill="x", padx=16, pady=(4, 6))
 
         self.switch_var = ctk.BooleanVar(value=self.is_active)
         self.toggle_switch = ctk.CTkSwitch(
             self.header_frame,
             text=f"自動変換を有効化 (Hotkey: {self.config.hotkey.upper().replace('<', '').replace('>', '')})",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             variable=self.switch_var,
             command=self._on_switch_toggled,
         )
-        self.toggle_switch.pack(side="left", padx=14, pady=12)
+        self.toggle_switch.pack(side="left", padx=14, pady=10)
 
-        # 2. タブビュー
+        # 3. タブビュー
         self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(fill="both", expand=True, padx=16, pady=8)
+        self.tabview.pack(fill="both", expand=True, padx=16, pady=6)
 
         tab_preset_container = self.tabview.add(self.TAB_PRESET)
         tab_prog_container = self.tabview.add(self.TAB_PROGRAMMABLE)
+        tab_latex_container = self.tabview.add(self.TAB_LATEX)
 
         # タブコンポーネントの配置
         self.preset_tab = PresetTabFrame(tab_preset_container, config=self.config)
@@ -80,16 +133,20 @@ class ClipboardTransformerApp(ctk.CTk):
         self.programmable_tab = ProgrammableTabFrame(tab_prog_container, config=self.config)
         self.programmable_tab.pack(fill="both", expand=True)
 
+        self.latex_tab = LatexTabFrame(tab_latex_container, config=self.config)
+        self.latex_tab.pack(fill="both", expand=True)
+
         # 保存されていたタブの復元
-        if self.config.active_tab in [self.TAB_PRESET, self.TAB_PROGRAMMABLE]:
+        valid_tabs = [self.TAB_PRESET, self.TAB_PROGRAMMABLE, self.TAB_LATEX]
+        if self.config.active_tab in valid_tabs:
             try:
                 self.tabview.set(self.config.active_tab)
             except Exception:
                 pass
 
-        # 3. ステータスバー
+        # 4. ステータスバー
         self.status_frame = ctk.CTkFrame(self)
-        self.status_frame.pack(fill="x", padx=16, pady=(8, 16))
+        self.status_frame.pack(fill="x", padx=16, pady=(6, 14))
 
         initial_msg = (
             "待機中: クリップボードの変更を監視しています"
@@ -103,13 +160,90 @@ class ClipboardTransformerApp(ctk.CTk):
             text_color="gray",
             anchor="w",
         )
-        self.status_label.pack(fill="x", padx=12, pady=10)
+        self.status_label.pack(fill="x", padx=12, pady=8)
+
+    def _sync_all_tabs_to_config(self) -> None:
+        """現在の各タブの入力値を config オブジェクトへ同期する。"""
+        self.config.is_active = self.switch_var.get()
+        try:
+            self.config.active_tab = self.tabview.get()
+        except Exception:
+            pass
+
+        self.preset_tab.save_to_config(self.config)
+        self.programmable_tab.save_to_config(self.config)
+        self.latex_tab.save_to_config(self.config)
+
+    def _sync_all_tabs_from_config(self) -> None:
+        """config オブジェクトの値を各タブのUIへ反映する。"""
+        self.preset_tab.load_from_config(self.config)
+        self.programmable_tab.load_from_config(self.config)
+        self.latex_tab.load_from_config(self.config)
+        try:
+            self.tabview.set(self.config.active_tab)
+        except Exception:
+            pass
+
+    def _update_preset_menu(self) -> None:
+        """プリセットドロップダウンの選択肢一覧を最新化する。"""
+        names = self.config.get_preset_names()
+        self.preset_menu.configure(values=names)
+        if self.config.current_preset in names:
+            self.preset_menu.set(self.config.current_preset)
+
+    def _on_preset_selected(self, choice: str) -> None:
+        """プリセットがドロップダウンで選択されたときの処理。"""
+        # 現在の変更を保存してから切り替え
+        self._sync_all_tabs_to_config()
+        if self.config.load_from_preset(choice):
+            self._sync_all_tabs_from_config()
+            self._update_status(f"プリセット「{choice}」を読み込みました", level="normal")
+
+    def _on_save_preset_clicked(self) -> None:
+        """現在の設定を現在選択中のプリセットに上書き保存する。"""
+        self._sync_all_tabs_to_config()
+        cur = self.config.current_preset
+        self.config.save_to_preset(cur)
+        save_config(self.config, self.config_path)
+        msg = f"プリセット「{cur}」を上書き保存しました"
+        self._update_status(msg, level="success")
+        show_toast(self, msg, level="success", duration_ms=2000)
+
+    def _on_new_preset_clicked(self) -> None:
+        """現在の設定を新しいプリセットとして保存する。"""
+        dialog = ctk.CTkInputDialog(
+            text="新しいプリセット名を入力してください:", title="プリセット新規作成"
+        )
+        new_name = dialog.get_input()
+        if new_name and new_name.strip():
+            name = new_name.strip()
+            self._sync_all_tabs_to_config()
+            self.config.save_to_preset(name)
+            self._update_preset_menu()
+            save_config(self.config, self.config_path)
+            msg = f"プリセット「{name}」を新規作成しました"
+            self._update_status(msg, level="success")
+            show_toast(self, msg, level="success", duration_ms=2000)
+
+    def _on_delete_preset_clicked(self) -> None:
+        """現在選択中のプリセットを削除する。"""
+        cur = self.config.current_preset
+        names = self.config.get_preset_names()
+        if len(names) <= 1:
+            show_toast(self, "最後の1件のプリセットは削除できません", level="skip", duration_ms=2500)
+            return
+
+        if self.config.delete_preset(cur):
+            self._update_preset_menu()
+            self._sync_all_tabs_from_config()
+            save_config(self.config, self.config_path)
+            msg = f"プリセット「{cur}」を削除しました"
+            self._update_status(msg, level="normal")
+            show_toast(self, msg, level="normal", duration_ms=2000)
 
     def _start_services(self) -> None:
         """バックグラウンド監視サービスを開始する。"""
-        # ホットキーリスナーの起動
         self.hotkey_listener.start()
-        # クリップボードポーリングループの開始
         self._schedule_clipboard_poll()
 
     def _schedule_clipboard_poll(self) -> None:
@@ -163,6 +297,12 @@ class ClipboardTransformerApp(ctk.CTk):
                 self._update_status("定型ルールが選択されていません", "skip")
                 return
             result = transformer.transform(content)
+        elif current_tab == self.TAB_LATEX:
+            transformer = self.latex_tab.get_transformer()
+            if transformer is None:
+                self._update_status("LaTeX設定が未完了です", "skip")
+                return
+            result = transformer.transform(content)
         else:
             transformer = self.programmable_tab.get_transformer()
             if transformer is None:
@@ -180,11 +320,10 @@ class ClipboardTransformerApp(ctk.CTk):
             self._update_status(msg, "success")
             show_toast(self, msg, level="success", duration_ms=2000)
 
-        # スキップ時（要素数不一致、未定義変数など）
+        # スキップ時
         elif result.status == "skip":
             msg = f"スキップ: {result.message}"
             self._update_status(msg, "skip")
-            # スキップ時は目立つようにトースト通知を表示
             show_toast(self, msg, level="skip", duration_ms=3000)
 
         # エラー時
@@ -197,21 +336,10 @@ class ClipboardTransformerApp(ctk.CTk):
         """ウィンドウ終了時に設定を保存し、リスナーを安全に停止する。"""
         logger.info("Closing application...")
 
-        # 現在のUI状態を設定モデルへ集約
-        self.config.is_active = self.switch_var.get()
-        try:
-            self.config.active_tab = self.tabview.get()
-        except Exception:
-            pass
-
-        self.preset_tab.save_to_config(self.config)
-        self.programmable_tab.save_to_config(self.config)
-
-        # 設定ファイルへ保存
+        self._sync_all_tabs_to_config()
+        # カレントプリセットにも最新状態を反映して保存
+        self.config.save_to_preset(self.config.current_preset)
         save_config(self.config, self.config_path)
 
-        # リスナーの停止
         self.hotkey_listener.stop()
-
-        # ウィンドウの破棄
         self.destroy()
