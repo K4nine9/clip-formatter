@@ -54,6 +54,13 @@ def get_default_presets() -> Dict[str, Dict[str, Any]]:
             "prog_pattern_input": "私は{a}時間で{b}つのりんごを食べました",
             "prog_pattern_output": "私は{b}時間で{a}つのりんごを食べました",
         },
+        "Python スクリプト計算": {
+            "active_tab": "プログラマブルモード",
+            "prog_mode": "script",
+            "prog_script_input_mode": "pattern",
+            "prog_script_pattern": "単価{price}円、数量{qty}個",
+            "prog_script_code": "# 変数 price, qty が使用可能\ntotal = int(price) * int(qty)\nresult = f'合計金額: {total:,}円 (税込: {int(total * 1.1):,}円)'",
+        },
     }
 
 
@@ -83,12 +90,19 @@ class AppConfig:
     unwrap_enabled: bool = False  # PDF改行・ハイフン除去
 
     # プログラマブル設定
-    prog_mode: str = "pattern"  # "pattern" または "delimiter"
+    prog_mode: str = "pattern"  # "pattern", "delimiter", "script"
     prog_pattern_input: str = "私は{a}時間で{b}つのりんごを食べました"
     prog_pattern_output: str = "私は{b}時間で{a}つのりんごを食べました"
     prog_delimiter: str = ","
     prog_input_vars: str = "a, b, c, d, e"
     prog_output_template: str = "{e}, {b}, {c}, {d}, {a}"
+
+    # スクリプトモード設定
+    prog_script_input_mode: str = "pattern"  # "pattern", "delimiter", "full_text"
+    prog_script_pattern: str = "単価{price}円、数量{qty}個"
+    prog_script_delimiter: str = ","
+    prog_script_vars: str = "a, b"
+    prog_script_code: str = "# 変数 price, qty (または a, b / text, lines) が使用可能\n# 出力結果を result 変数に代入してください\ntotal = int(price) * int(qty)\nresult = f'合計金額: {total:,}円 (税込: {int(total * 1.1):,}円)'"
 
     # LaTeXモード設定
     latex_mode: str = "table"  # "table" または "formula"
