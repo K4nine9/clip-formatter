@@ -19,8 +19,16 @@ class LatexTabFrame(ctk.CTkFrame):
         "booktabs (学術推奨)": LatexTableTransformer.STYLE_BOOKTABS,
         "standard (\\hline)": LatexTableTransformer.STYLE_STANDARD,
         "本体のみ (& と \\\\)": LatexTableTransformer.STYLE_BODY_ONLY,
+        "Markdown 表 (| Col1 | Col2 |)": LatexTableTransformer.STYLE_MARKDOWN,
     }
     STYLE_VALUE_MAP = {v: k for k, v in STYLE_LABEL_MAP.items()}
+
+    HIGHLIGHT_LABEL_MAP = {
+        "強調なし": LatexTableTransformer.HIGHLIGHT_NONE,
+        "列ごとの最大値を太字 (Max)": LatexTableTransformer.HIGHLIGHT_MAX,
+        "列ごとの最小値を太字 (Min)": LatexTableTransformer.HIGHLIGHT_MIN,
+    }
+    HIGHLIGHT_VALUE_MAP = {v: k for k, v in HIGHLIGHT_LABEL_MAP.items()}
 
     ENV_LABEL_MAP = {
         "インライン ($ ... $)": LatexFormulaTransformer.ENV_INLINE,
@@ -84,47 +92,58 @@ class LatexTabFrame(ctk.CTkFrame):
 
         # 区切り文字
         delim_row = ctk.CTkFrame(self.table_frame, fg_color="transparent")
-        delim_row.pack(fill="x", pady=4)
+        delim_row.pack(fill="x", pady=3)
         ctk.CTkLabel(delim_row, text="入力区切り文字:").pack(side="left", padx=(0, 8))
         self.table_delim_selector = DelimiterSelector(delim_row, default_delimiter="\t")
         self.table_delim_selector.pack(side="left")
 
         # スタイル選択
         style_row = ctk.CTkFrame(self.table_frame, fg_color="transparent")
-        style_row.pack(fill="x", pady=4)
+        style_row.pack(fill="x", pady=3)
         ctk.CTkLabel(style_row, text="表スタイル:").pack(side="left", padx=(0, 8))
         self.table_style_menu = ctk.CTkOptionMenu(
             style_row,
             values=list(self.STYLE_LABEL_MAP.keys()),
-            width=180,
+            width=210,
         )
         self.table_style_menu.pack(side="left")
 
         # 列配置 (Alignment)
         align_row = ctk.CTkFrame(self.table_frame, fg_color="transparent")
-        align_row.pack(fill="x", pady=4)
+        align_row.pack(fill="x", pady=3)
         ctk.CTkLabel(align_row, text="列揃え (Alignment):").pack(side="left", padx=(0, 8))
         self.table_align_menu = ctk.CTkOptionMenu(
             align_row,
             values=["自動推定 (数値r/文字列l)", "一括中央揃え (c)", "一括左揃え (l)", "一括右揃え (r)"],
-            width=180,
+            width=210,
         )
         self.table_align_menu.pack(side="left")
 
+        # 最良値の太字化
+        hl_row = ctk.CTkFrame(self.table_frame, fg_color="transparent")
+        hl_row.pack(fill="x", pady=3)
+        ctk.CTkLabel(hl_row, text="最良値の太字化:").pack(side="left", padx=(0, 8))
+        self.table_hl_menu = ctk.CTkOptionMenu(
+            hl_row,
+            values=list(self.HIGHLIGHT_LABEL_MAP.keys()),
+            width=210,
+        )
+        self.table_hl_menu.pack(side="left")
+
         # オプション（ヘッダー・丸め）
         opt_row = ctk.CTkFrame(self.table_frame, fg_color="transparent")
-        opt_row.pack(fill="x", pady=4)
+        opt_row.pack(fill="x", pady=3)
 
         self.table_header_var = ctk.BooleanVar(value=True)
         self.chk_table_header = ctk.CTkCheckBox(
             opt_row,
-            text="先頭行をヘッダーとして扱う (\\midrule)",
+            text="先頭行をヘッダーとして扱う",
             variable=self.table_header_var,
         )
         self.chk_table_header.pack(side="left", padx=(0, 16))
 
         round_row = ctk.CTkFrame(self.table_frame, fg_color="transparent")
-        round_row.pack(fill="x", pady=4)
+        round_row.pack(fill="x", pady=3)
 
         self.table_round_var = ctk.BooleanVar(value=False)
         self.chk_table_round = ctk.CTkCheckBox(
@@ -143,7 +162,6 @@ class LatexTabFrame(ctk.CTkFrame):
         # 3. 数式設定エリア
         # =======================================================
         self.formula_frame = ctk.CTkFrame(self, fg_color="transparent")
-        # デフォルトは非表示、モード切り替えで制御
 
         # 変換方向
         dir_header = ctk.CTkLabel(
@@ -237,6 +255,9 @@ class LatexTabFrame(ctk.CTkFrame):
         elif align == "r":
             self.table_align_menu.set("一括右揃え (r)")
 
+        hl = getattr(config, "latex_table_highlight", LatexTableTransformer.HIGHLIGHT_NONE)
+        self.table_hl_menu.set(self.HIGHLIGHT_VALUE_MAP.get(hl, "強調なし"))
+
         self.table_header_var.set(getattr(config, "latex_table_header", True))
         self.table_round_var.set(getattr(config, "latex_table_round", False))
         self.table_digits_entry.delete(0, "end")
@@ -273,6 +294,10 @@ class LatexTabFrame(ctk.CTkFrame):
         else:
             config.latex_table_align = "auto"
 
+        config.latex_table_highlight = self.HIGHLIGHT_LABEL_MAP.get(
+            self.table_hl_menu.get(), LatexTableTransformer.HIGHLIGHT_NONE
+        )
+
         config.latex_table_header = self.table_header_var.get()
         config.latex_table_round = self.table_round_var.get()
         try:
@@ -302,6 +327,10 @@ class LatexTabFrame(ctk.CTkFrame):
             else:
                 align = "auto"
 
+            highlight = self.HIGHLIGHT_LABEL_MAP.get(
+                self.table_hl_menu.get(), LatexTableTransformer.HIGHLIGHT_NONE
+            )
+
             round_digits = None
             if self.table_round_var.get():
                 try:
@@ -315,6 +344,7 @@ class LatexTabFrame(ctk.CTkFrame):
                 alignment=align,
                 has_header=self.table_header_var.get(),
                 round_digits=round_digits,
+                highlight_best=highlight,
             )
         else:
             direction = self.formula_dir_var.get()

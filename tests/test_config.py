@@ -103,18 +103,24 @@ class TestConfig(unittest.TestCase):
             active_tab="LaTeXモード",
             latex_mode="table",
             latex_table_delim="\t",
-            latex_table_style="booktabs",
+            latex_table_style="markdown",
+            latex_table_highlight="max",
             latex_formula_direction="latex_to_plain",
             unwrap_enabled=True,
+            hotkey_undo="<ctrl>+<alt>+u",
+            close_to_tray=False,
         )
         self.assertTrue(save_config(cfg, self.config_path))
         loaded = load_config(self.config_path)
         self.assertEqual(loaded.active_tab, "LaTeXモード")
         self.assertEqual(loaded.latex_mode, "table")
         self.assertEqual(loaded.latex_table_delim, "\t")
-        self.assertEqual(loaded.latex_table_style, "booktabs")
+        self.assertEqual(loaded.latex_table_style, "markdown")
+        self.assertEqual(loaded.latex_table_highlight, "max")
         self.assertEqual(loaded.latex_formula_direction, "latex_to_plain")
         self.assertTrue(loaded.unwrap_enabled)
+        self.assertEqual(loaded.hotkey_undo, "<ctrl>+<alt>+u")
+        self.assertFalse(loaded.close_to_tray)
 
     def test_load_corrupted_file_falls_back_to_default(self):
         with open(self.config_path, "w", encoding="utf-8") as f:

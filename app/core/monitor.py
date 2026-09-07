@@ -26,6 +26,7 @@ class ClipboardMonitor:
         self._last_read_hash: Optional[str] = None
         self._last_written_hash: Optional[str] = None
         self._last_read_text: str = ""
+        self._last_original_text: Optional[str] = None
 
     @staticmethod
     def _compute_hash(text: str) -> str:
@@ -64,6 +65,7 @@ class ClipboardMonitor:
         # 新規テキスト検知
         self._last_read_hash = content_hash
         self._last_read_text = content
+        self._last_original_text = content
         # 書き込みキャッシュは新しいユーザーコピーによってリセット
         self._last_written_hash = None
 
@@ -85,3 +87,21 @@ class ClipboardMonitor:
         except Exception as e:
             logger.error("Failed to write to clipboard: %s", e)
             return False
+
+    def undo(self) -> Optional[str]:
+        """直前の変換前テキストをクリップボードに復元する。
+
+        Returns:
+            Optional[str]: 復元された元のテキスト。復元対象がない場合は None。
+        """
+        if not self._last_original_text:
+            return None
+        orig = self._last_original_text
+        self._last_original_text = None
+        if self.write_clipboard(orig):
+            return orig
+        return None
+
+    def can_undo(self) -> bool:
+        """元に戻せるテキストが存在するかどうかを返す。"""
+        return bool(self._last_original_text)

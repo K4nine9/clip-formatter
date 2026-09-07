@@ -12,30 +12,46 @@ class GlobalHotkeyListener:
     """システム全体のキーボード入力を監視し、指定ホットキーでコールバックを実行するリスナー。"""
 
     DEFAULT_HOTKEY = "<ctrl>+<alt>+x"
+    DEFAULT_UNDO_HOTKEY = "<ctrl>+<alt>+z"
 
     def __init__(
         self,
         hotkey_str: str = DEFAULT_HOTKEY,
         on_triggered_callback: Optional[Callable[[], None]] = None,
+        undo_hotkey_str: Optional[str] = DEFAULT_UNDO_HOTKEY,
+        on_undo_callback: Optional[Callable[[], None]] = None,
     ):
         """
         Args:
-            hotkey_str: pynput形式のホットキー文字列（例: '<ctrl>+<alt>+x'）。
-            on_triggered_callback: ホットキー押下時に呼び出すコールバック関数。
+            hotkey_str: トグル用ホットキー文字列（例: '<ctrl>+<alt>+x'）。
+            on_triggered_callback: トグル押下時に呼び出すコールバック関数。
+            undo_hotkey_str: Undo用ホットキー文字列（例: '<ctrl>+<alt>+z'）。
+            on_undo_callback: Undo押下時に呼び出すコールバック関数。
         """
         self.hotkey_str = hotkey_str
         self.on_triggered_callback = on_triggered_callback
+        self.undo_hotkey_str = undo_hotkey_str
+        self.on_undo_callback = on_undo_callback
         self._listener: Optional[keyboard.GlobalHotKeys] = None
         self._thread: Optional[threading.Thread] = None
 
     def _on_hotkey_activated(self) -> None:
-        """ホットキーが検知されたときに実行される内部メソッド。"""
+        """トグル用ホットキーが検知されたときに実行される内部メソッド。"""
         logger.info("Global hotkey triggered: %s", self.hotkey_str)
         if self.on_triggered_callback:
             try:
                 self.on_triggered_callback()
             except Exception as e:
                 logger.error("Error in hotkey callback: %s", e, exc_info=True)
+
+    def _on_undo_activated(self) -> None:
+        """Undo用ホットキーが検知されたときに実行される内部メソッド。"""
+        logger.info("Global undo hotkey triggered: %s", self.undo_hotkey_str)
+        if self.on_undo_callback:
+            try:
+                self.on_undo_callback()
+            except Exception as e:
+                logger.error("Error in undo hotkey callback: %s", e, exc_info=True)
 
     def start(self) -> None:
         """ホットキーリスナーをバックグラウンドスレッドで起動する。"""
@@ -45,14 +61,17 @@ class GlobalHotkeyListener:
 
         try:
             hotkey_mapping = {self.hotkey_str: self._on_hotkey_activated}
+            if self.undo_hotkey_str and self.on_undo_callback:
+                hotkey_mapping[self.undo_hotkey_str] = self._on_undo_activated
+
             self._listener = keyboard.GlobalHotKeys(hotkey_mapping)
             self._thread = threading.Thread(
                 target=self._listener.run, daemon=True, name="GlobalHotkeyListenerThread"
             )
             self._thread.start()
-            logger.info("Started global hotkey listener for '%s'", self.hotkey_str)
+            logger.info("Started global hotkey listener for '%s'", list(hotkey_mapping.keys()))
         except Exception as e:
-            logger.error("Failed to start hotkey listener for '%s': %s", self.hotkey_str, e)
+            logger.error("Failed to start hotkey listener: %s", e)
             self._listener = None
 
     def stop(self) -> None:

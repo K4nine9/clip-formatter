@@ -8,11 +8,16 @@ from app.transformers.preset import NumberFormatTransformer
 
 
 class LatexTableTransformer(BaseTransformer):
-    """TSV、CSV、スペース区切り等の表データを LaTeX の tabular 形式へ変換する。"""
+    """TSV、CSV、スペース区切り等の表データを LaTeX / Markdown の表形式へ変換する。"""
 
     STYLE_BOOKTABS = "booktabs"
     STYLE_STANDARD = "standard"
     STYLE_BODY_ONLY = "body_only"
+    STYLE_MARKDOWN = "markdown"
+
+    HIGHLIGHT_NONE = "none"
+    HIGHLIGHT_MAX = "max"
+    HIGHLIGHT_MIN = "min"
 
     def __init__(
         self,
@@ -21,12 +26,14 @@ class LatexTableTransformer(BaseTransformer):
         alignment: str = "auto",
         has_header: bool = True,
         round_digits: Optional[int] = None,
+        highlight_best: str = HIGHLIGHT_NONE,
     ):
         self.delimiter = delimiter
         self.style = style
         self.alignment = alignment
         self.has_header = has_header
         self.round_digits = round_digits
+        self.highlight_best = highlight_best
         if self.round_digits is not None:
             self._number_transformer = NumberFormatTransformer(
                 dec_mode="round", dec_digits=self.round_digits
@@ -44,14 +51,12 @@ class LatexTableTransformer(BaseTransformer):
         for col_idx in range(num_cols):
             numeric_count = 0
             total_cells = 0
-            # ヘッダーを除いたデータ行で判定（ヘッダーのみの場合は全体）
             start_row = 1 if (self.has_header and len(rows) > 1) else 0
             for row in rows[start_row:]:
                 if col_idx < len(row):
                     val = row[col_idx].strip()
                     if val:
                         total_cells += 1
-                        # 数値判定 (例: 123, -4.56, 95%)
                         cleaned = val.rstrip("%").strip()
                         try:
                             float(cleaned)
@@ -66,6 +71,45 @@ class LatexTableTransformer(BaseTransformer):
 
         return "".join(aligns)
 
+    def _apply_highlight_best(self, rows: List[List[str]]) -> None:
+        """各列の最良値（最大値または最小値）を判定し、太字タグで装飾する。"""
+        if self.highlight_best not in (self.HIGHLIGHT_MAX, self.HIGHLIGHT_MIN):
+            return
+
+        start_row = 1 if (self.has_header and len(rows) > 1) else 0
+        num_cols = max(len(r) for r in rows)
+        is_markdown = (self.style == self.STYLE_MARKDOWN)
+
+        for col_idx in range(num_cols):
+            col_vals = []
+            for row_idx in range(start_row, len(rows)):
+                if col_idx < len(rows[row_idx]):
+                    raw = rows[row_idx][col_idx].strip()
+                    cleaned = raw.rstrip("%").strip()
+                    try:
+                        val = float(cleaned)
+                        col_vals.append((val, row_idx))
+                    except ValueError:
+                        pass
+
+            if not col_vals:
+                continue
+
+            # 最良値の決定
+            if self.highlight_best == self.HIGHLIGHT_MAX:
+                target_val = max(v for v, _ in col_vals)
+            else:
+                target_val = min(v for v, _ in col_vals)
+
+            # 最良値に一致するセルを太字化
+            for val, row_idx in col_vals:
+                if val == target_val:
+                    cell_text = rows[row_idx][col_idx]
+                    if is_markdown:
+                        rows[row_idx][col_idx] = f"**{cell_text}**"
+                    else:
+                        rows[row_idx][col_idx] = f"\\textbf{{{cell_text}}}"
+
     def transform(self, text: str) -> TransformResult:
         if not text or not text.strip():
             return TransformResult.unchanged(text, "入力テキストが空です")
@@ -77,7 +121,6 @@ class LatexTableTransformer(BaseTransformer):
         # 行・列に分割
         rows: List[List[str]] = []
         for line in lines:
-            # 数値丸めの適用（有効な場合）
             processed_line = line
             if self._number_transformer:
                 num_res = self._number_transformer.transform(line)
@@ -101,7 +144,39 @@ class LatexTableTransformer(BaseTransformer):
         else:
             col_align = self.alignment
 
-        # テーブル本体の行生成
+        # 最良値の太字化
+        self._apply_highlight_best(rows)
+
+        # 1. Markdown 表スタイル
+        if self.style == self.STYLE_MARKDOWN:
+            md_lines: List[str] = []
+            # セパレータ生成
+            sep_parts = []
+            for a in col_align:
+                if a == "r":
+                    sep_parts.append("---:")
+                elif a == "c":
+                    sep_parts.append(":---:")
+                else:
+                    sep_parts.append(":---")
+
+            if self.has_header and len(rows) > 1:
+                header_row = "| " + " | ".join(rows[0]) + " |"
+                md_lines.append(header_row)
+                md_lines.append("| " + " | ".join(sep_parts) + " |")
+                for row in rows[1:]:
+                    md_lines.append("| " + " | ".join(row) + " |")
+            else:
+                # ヘッダーなしの場合は先頭に Col 1, Col 2 などを付与
+                dummy_headers = [f"Col {i+1}" for i in range(num_cols)]
+                md_lines.append("| " + " | ".join(dummy_headers) + " |")
+                md_lines.append("| " + " | ".join(sep_parts) + " |")
+                for row in rows:
+                    md_lines.append("| " + " | ".join(row) + " |")
+
+            return TransformResult.successful("\n".join(md_lines), "Markdown 表への変換")
+
+        # 2. LaTeX テーブル本体の行生成
         body_lines: List[str] = []
         for idx, row in enumerate(rows):
             row_str = " & ".join(row) + r" \\"
@@ -112,7 +187,7 @@ class LatexTableTransformer(BaseTransformer):
                 elif self.style == self.STYLE_STANDARD:
                     body_lines.append(r"\hline")
 
-        # スタイル別出力構築
+        # 3. スタイル別出力構築
         if self.style == self.STYLE_BODY_ONLY:
             result_text = "\n".join(body_lines)
             return TransformResult.successful(result_text, "LaTeX 表本体への変換")

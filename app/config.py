@@ -64,6 +64,8 @@ class AppConfig:
     is_active: bool = False
     active_tab: str = "定型ルールモード"
     hotkey: str = "<ctrl>+<alt>+x"
+    hotkey_undo: str = "<ctrl>+<alt>+z"
+    close_to_tray: bool = True
 
     # プリセット管理
     current_preset: str = "デフォルト"
@@ -91,11 +93,12 @@ class AppConfig:
     # LaTeXモード設定
     latex_mode: str = "table"  # "table" または "formula"
     latex_table_delim: str = "\t"
-    latex_table_style: str = "booktabs"  # "booktabs", "standard", "body_only"
+    latex_table_style: str = "booktabs"  # "booktabs", "standard", "body_only", "markdown"
     latex_table_align: str = "auto"  # "auto", "l", "c", "r"
     latex_table_header: bool = True
     latex_table_round: bool = False
     latex_table_digits: int = 2
+    latex_table_highlight: str = "none"  # "none", "max", "min"
     latex_formula_direction: str = "plain_to_latex"  # "plain_to_latex", "latex_to_plain"
     latex_formula_env: str = "inline"  # "inline", "display", "none"
 
@@ -116,8 +119,7 @@ class AppConfig:
     def save_to_preset(self, preset_name: str) -> None:
         """現在の設定値を指定プリセットとして保存・更新する。"""
         d = asdict(self)
-        # presets, current_preset, is_active, hotkey はプロファイル内には含めない
-        exclude_keys = {"presets", "current_preset", "is_active", "hotkey"}
+        exclude_keys = {"presets", "current_preset", "is_active", "hotkey", "hotkey_undo", "close_to_tray"}
         preset_data = {k: v for k, v in d.items() if k not in exclude_keys}
         self.presets[preset_name] = copy.deepcopy(preset_data)
         self.current_preset = preset_name
@@ -127,8 +129,9 @@ class AppConfig:
         if preset_name not in self.presets:
             return False
         preset_data = self.presets[preset_name]
+        exclude_keys = {"presets", "current_preset", "is_active", "hotkey", "hotkey_undo", "close_to_tray"}
         for k, v in preset_data.items():
-            if hasattr(self, k) and k not in ("presets", "current_preset", "is_active", "hotkey"):
+            if hasattr(self, k) and k not in exclude_keys:
                 setattr(self, k, copy.deepcopy(v))
         self.current_preset = preset_name
         return True

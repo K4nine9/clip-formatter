@@ -49,6 +49,61 @@ class TestLatexTableTransformer(unittest.TestCase):
         )
         self.assertEqual(res.text, expected)
 
+    def test_markdown_table_conversion(self):
+        tsv_text = (
+            "Model\tAccuracy\tLoss\n"
+            "Baseline\t0.852\t0.128\n"
+            "Ours\t0.941\t0.034"
+        )
+        transformer = LatexTableTransformer(
+            delimiter="\t",
+            style=LatexTableTransformer.STYLE_MARKDOWN,
+            has_header=True,
+        )
+        res = transformer.transform(tsv_text)
+        self.assertTrue(res.success)
+        expected = (
+            "| Model | Accuracy | Loss |\n"
+            "| :--- | ---: | ---: |\n"
+            "| Baseline | 0.852 | 0.128 |\n"
+            "| Ours | 0.941 | 0.034 |"
+        )
+        self.assertEqual(res.text, expected)
+
+    def test_latex_table_highlight_max(self):
+        tsv_text = (
+            "Model\tScoreA\tScoreB\n"
+            "Baseline\t0.85\t0.90\n"
+            "Ours\t0.94\t0.88"
+        )
+        transformer = LatexTableTransformer(
+            delimiter="\t",
+            style=LatexTableTransformer.STYLE_BOOKTABS,
+            has_header=True,
+            highlight_best=LatexTableTransformer.HIGHLIGHT_MAX,
+        )
+        res = transformer.transform(tsv_text)
+        self.assertTrue(res.success)
+        self.assertIn(r"Baseline & 0.85 & \textbf{0.90} \\", res.text)
+        self.assertIn(r"Ours & \textbf{0.94} & 0.88 \\", res.text)
+
+    def test_markdown_table_highlight_max(self):
+        tsv_text = (
+            "Model\tScoreA\tScoreB\n"
+            "Baseline\t0.85\t0.90\n"
+            "Ours\t0.94\t0.88"
+        )
+        transformer = LatexTableTransformer(
+            delimiter="\t",
+            style=LatexTableTransformer.STYLE_MARKDOWN,
+            has_header=True,
+            highlight_best=LatexTableTransformer.HIGHLIGHT_MAX,
+        )
+        res = transformer.transform(tsv_text)
+        self.assertTrue(res.success)
+        self.assertIn("| Baseline | 0.85 | **0.90** |", res.text)
+        self.assertIn("| Ours | **0.94** | 0.88 |", res.text)
+
 
 class TestLatexFormulaTransformer(unittest.TestCase):
     """LatexFormulaTransformer の単体テスト"""
