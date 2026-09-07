@@ -218,3 +218,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 .agents
+
+documents
+
+# Local config
+config.json
